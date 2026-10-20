@@ -1,2 +1,5 @@
 .idea/
 .agents/
+.venv/
+__pycache__/
+*.py[cod]
