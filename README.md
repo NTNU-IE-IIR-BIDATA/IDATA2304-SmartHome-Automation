@@ -5,7 +5,7 @@ Custom application-layer protocol and network implementation for a Smart Home Au
 
 ```console
 brew install uv
-uv python install 3.12
+uv python install 3.15
 uv venv
 source .venv/bin/activate       # macOS/Linux
 # .venv\Scripts\activate        # Windows
