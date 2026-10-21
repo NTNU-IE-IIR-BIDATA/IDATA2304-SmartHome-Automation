@@ -273,6 +273,6 @@ If a sensor node loses connection, the server marks the node `connected: false` 
 
 **Unique ID's**: Every sensor node is configured with a unique ID string on startup. The server rejects connection requests if a node attempts to register with an already active `node_id`.
 
-**Message size**: No single-line-JSON should exceed 64KiB to avoid memory overload by parsing in buffer. 
+**Message size**: No single-line-JSON should exceed 64KiB to avoid memory overload by parsing in buffer as a security measure against malicious intent.
 
 **Anomaly detection**: Control panels evaluate incoming data against known threshold rules (e.g. temperatures exceeding an unsafe limit) to trigger anomaly warnings in the user interface.
