@@ -29,7 +29,7 @@ MESSAGE_SCHEMAS = {
         "target_node_id": str,
         "actuator_id": str,
         "command": str,
-        "value": (int, float),
+        "value": (int, float, type(None)),
     },
 
     MessageType.ACTUATOR_STATE: {
