@@ -13,7 +13,7 @@ class TestFraming:
         assert isinstance(result, bytes)
         assert result.endswith(b"\n")
         assert decode_message(result) == message
-        assert result[:-1] == b'{"type":"SYSTEM_STATE","nodes":[]}'
+        assert result[:-1] == b'{"type": "SYSTEM_STATE", "nodes": []}'
 
     def test_decode(self): #Check that the decode is converting the bytes back to a dictionary and validates the message.
         data = b'{"type": "SYSTEM_STATE", "nodes": []}\n'
