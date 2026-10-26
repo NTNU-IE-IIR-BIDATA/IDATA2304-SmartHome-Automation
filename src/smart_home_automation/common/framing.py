@@ -4,12 +4,10 @@ from .constants import ErrorCode, MAX_MESSAGE_SIZE
 
 def encode_message(message: dict) -> bytes:
     """
-    Encode a message to bytestring using utf-8
-
-    :param message: the message to encode
-
-    :return: the encoded bytestring in utf-8
-
+    Encode a dictionary to a JSON bytestring with utf-8.
+    
+    :param message: the dictionary to encode
+    :return: encoded bytestring
     """
     validate_message(message)
     bytestring = (json.dumps(message) + "\n").encode("utf-8")

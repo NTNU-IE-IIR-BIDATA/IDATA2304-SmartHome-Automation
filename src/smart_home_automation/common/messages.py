@@ -71,3 +71,10 @@ def validate_message(message: dict):
             raise ProtocolError(
                 ErrorCode.INVALID_SCHEMA,
                 f"Invalid type for field {field_name}: expected {expected_type}, got {type(actual_value)}")
+
+def create_error_message(code: ErrorCode, message: str) -> dict:
+    return {
+        "type": MessageType.ERROR,
+        "code": str(code),
+        "message": message
+    }
