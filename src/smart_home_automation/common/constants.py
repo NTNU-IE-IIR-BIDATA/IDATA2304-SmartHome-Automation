@@ -1,10 +1,10 @@
 from enum import StrEnum
 
-DEFAULT_PORT = 5555
-WILDCARD = "ALL"
+DEFAULT_PORT = 5555 # Default port for the smart home automation system
+WILDCARD = "ALL" # Used to indicate all nodes or panels
 MAX_MESSAGE_SIZE = 64 * 1024 # 64 KiB
 
-class ErrorCode(StrEnum):
+class ErrorCode(StrEnum): #
     AUTH_FAILED = "ERR_AUTH_FAILED"
     MALFORMED_JSON = "ERR_MALFORMED_JSON"
     INVALID_SCHEMA = "ERR_INVALID_SCHEMA"
