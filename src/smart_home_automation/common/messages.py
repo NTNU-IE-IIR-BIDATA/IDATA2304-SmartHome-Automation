@@ -1,5 +1,5 @@
 
-from constants import MessageType, ErrorCode
+from .constants import MessageType, ErrorCode
 
 MESSAGE_SCHEMAS = {
     MessageType.REGISTER_NODE: {
@@ -18,14 +18,14 @@ MESSAGE_SCHEMAS = {
     },
 
     MessageType.SENSOR_DATA: {
-        "node:id": str,
+        "node_id": str,
         "sensor_id": str,
         "value": (int, float, str, bool),
         "unit": str,
         "timestamp": (int, float),
     },
 
-    MessageType.ACTUATOR_COMMAND: {
+    MessageType.ACTUATOR_CMD: {
         "target_node_id": str,
         "actuator_id": str,
         "command": str,
@@ -53,21 +53,21 @@ class ProtocolError(Exception):
 
 def validate_message(message: dict):
     if "type" not in message:
-        raise ProtocolError(ErrorCode.MISSING_TYPE, f"Missing required field: type")
+        raise ProtocolError(ErrorCode.INVALID_SCHEMA, f"Missing required field: type")
 
     msg_type = message.get("type")
 
     schema = MESSAGE_SCHEMAS.get(msg_type)
 
     if schema is None:
-        raise ProtocolError(ErrorCode.INVALID_TYPE, f"No schema defined for message type: {msg_type}")
+        raise ProtocolError(ErrorCode.INVALID_SCHEMA, f"No schema defined for message type: {msg_type}")
 
     for field_name, expected_type in schema.items():
         if field_name not in message:
-            raise ProtocolError(ErrorCode.MISSING_FIELD, f"Missing required field: {field_name}")
+            raise ProtocolError(ErrorCode.INVALID_SCHEMA, f"Missing required field: {field_name}")
 
         actual_value = message[field_name]
         if not isinstance(actual_value, expected_type):
             raise ProtocolError(
-                ErrorCode.INVAlID_SCHEMA,
+                ErrorCode.INVALID_SCHEMA,
                 f"Invalid type for field {field_name}: expected {expected_type}, got {type(actual_value)}")

@@ -2,6 +2,7 @@ from enum import StrEnum
 
 DEFAULT_PORT = 5555
 WILDCARD = "ALL"
+MAX_MESSAGE_SIZE = 64 * 1024 # 64 KiB
 
 class ErrorCode(StrEnum):
     AUTH_FAILED = "ERR_AUTH_FAILED"
