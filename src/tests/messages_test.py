@@ -54,11 +54,13 @@ VALID_MESSAGES = [
 ]
 
 
+# Every supported protocol message type should pass the schema validation.
 @pytest.mark.parametrize("message", VALID_MESSAGES)
 def test_valid_message_is_accepted(message):
     assert validate_message(message) is None
 
 
+# A message without a valid type is invalid.
 def test_missing_type_is_rejected():
     with pytest.raises(ProtocolError, match="type") as error:
         validate_message({"node_id": "living_room_01"})
@@ -66,6 +68,7 @@ def test_missing_type_is_rejected():
     assert error.value.code == ErrorCode.INVALID_SCHEMA
 
 
+# Message types outside the protocol specification are rejected.
 def test_unknown_message_type_is_rejected():
     with pytest.raises(ProtocolError, match="UNKNOWN_MESSAGE") as error:
         validate_message({"type": "UNKNOWN_MESSAGE"})
@@ -73,6 +76,7 @@ def test_unknown_message_type_is_rejected():
     assert error.value.code == ErrorCode.INVALID_SCHEMA
 
 
+# Each protocol message must contain all its fields required by its schema.
 @pytest.mark.parametrize(
     ("message", "missing_field"),
     [
@@ -102,6 +106,7 @@ def test_missing_required_field_is_rejected(message, missing_field):
     assert error.value.code == ErrorCode.INVALID_SCHEMA
 
 
+# Required fields must contain values of the types defined by the schema.
 @pytest.mark.parametrize(
     ("message", "invalid_field"),
     [
