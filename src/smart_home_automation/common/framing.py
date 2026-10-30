@@ -1,11 +1,13 @@
 import json
-from .messages import validate_message, ProtocolError
-from .constants import ErrorCode, MAX_MESSAGE_SIZE
+
+from .constants import MAX_MESSAGE_SIZE, ErrorCode
+from .messages import ProtocolError, validate_message
+
 
 def encode_message(message: dict) -> bytes:
     """
     Encode a dictionary to a JSON bytestring with utf-8.
-    
+
     :param message: the dictionary to encode
     :return: encoded bytestring
     """

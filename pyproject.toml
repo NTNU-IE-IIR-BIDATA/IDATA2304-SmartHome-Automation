@@ -18,4 +18,23 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "ruff>=0.17.3",
 ]
+
+[tool.ruff]
+# Target python version
+target-version = "py312"
+
+# Max line length (standard is 88 or 100)
+line-length = 100
+
+[tool.ruff.lint]
+# Selected rule sets:
+# E / W: pycodestyle errors and warnings
+# F: Pyflakes (detects undefined names like `logger`, unused imports, etc.)
+# I: isort (organizes imports)
+# B: flake8-bugbear (common bug patterns)
+select = ["E", "W", "F", "I", "B"]
+
+# Rules to ignore (if any)
+ignore = []
