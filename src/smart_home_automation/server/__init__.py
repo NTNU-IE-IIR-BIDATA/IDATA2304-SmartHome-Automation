@@ -3,18 +3,28 @@ import logging
 
 from .server import Server
 
+
+async def run_server():
+    server = Server()
+    try:
+        await server.start()
+    except (asyncio.CancelledError, KeyboardInterrupt):
+        logging.info("Shutting down server...")
+    finally:
+        await server.stop()
+
+
 def main():
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s"
+        format="%(asctime)s [%(levelname)s] %(message)s",
     )
-
-    server = Server()
-
     try:
-        asyncio.run(server.start())
+        asyncio.run(run_server())
     except KeyboardInterrupt:
-        logging.info("Server shut down by user")
+        # Loop has closed cleanly
+        logging.info("Server shutdown complete.")
+
 
 if __name__ == "__main__":
     main()

@@ -1,8 +1,7 @@
 import asyncio
 import logging
-from typing import Optional
 
-from ..common.constants import DEFAULT_PORT, MessageType
+from ..common.constants import DEFAULT_PORT, MessageType, ErrorCode
 from ..common.framing import decode_message, encode_message
 from ..common.messages import ProtocolError, create_error_message
 
@@ -13,7 +12,7 @@ class Server:
         self.host = host
         self.port = port
         self.state = state
-        self.server: Optional[asyncio.Server] = None
+        self.server: asyncio.Server | None = None
 
     async def start(self):
         """
@@ -82,7 +81,7 @@ class Server:
                 message = decode_message(line)
             except ProtocolError as err:
                 logging.warning(f"Protocol error from {peer}: {err.code} - {err.message}")
-                await self._send_error(writer, str(err.code), err.message)
+                await self._send_error(writer, err.code, err.message)
                 continue
 
             await self._dispatch_message(message, writer, peer)
@@ -126,6 +125,7 @@ class Server:
         if self.state:
             #server state integration goes here
             pass
+
     async def _handle_register_panel(self, message: dict, writer: asyncio.StreamWriter, peer):
         """
         Handle REGISTER_PANEL messages from a control panel
@@ -139,7 +139,7 @@ class Server:
         role = message["role"]
         logging.info(f"Control panel {client_id} registered from {peer} with role {role}")
 
-    async def _send_error(self, writer: asyncio.StreamWriter, code: str, message: str):
+    async def _send_error(self, writer: asyncio.StreamWriter, code: ErrorCode, message: str):
         """
         Send an ERROR response message to the client
         :param writer:
