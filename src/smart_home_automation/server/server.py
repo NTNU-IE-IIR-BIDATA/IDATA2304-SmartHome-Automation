@@ -4,6 +4,7 @@ import logging
 from ..common.constants import DEFAULT_PORT, MessageType, ErrorCode
 from ..common.framing import decode_message, encode_message
 from ..common.messages import ProtocolError, create_error_message
+from .state import ServerState
 
 
 class Server:
@@ -11,7 +12,7 @@ class Server:
     def __init__(self, host: str ="127.0.0.1", port: int =DEFAULT_PORT, state=None):
         self.host = host
         self.port = port
-        self.state = state
+        self.state = state if state is not None else ServerState()
         self.server: asyncio.Server | None = None
 
     async def start(self):
@@ -57,6 +58,7 @@ class Server:
         except Exception as e:
             logging.error(f"Unexpected error with client {peer}: {e}", exc_info=True)
         finally:
+            self.state.disconnect(writer)
             logging.info(f"Closing connection to {peer}")
             writer.close()
             await writer.wait_closed()
@@ -84,7 +86,11 @@ class Server:
                 await self._send_error(writer, err.code, err.message)
                 continue
 
-            await self._dispatch_message(message, writer, peer)
+            try:
+                await self._dispatch_message(message, writer, peer)
+            except ProtocolError as err:
+                await self._send_error(writer, err.code, err.message)
+
 
     async def _dispatch_message(self, message: dict, writer: asyncio.StreamWriter, peer):
         """
@@ -117,14 +123,13 @@ class Server:
         sensors = message.get("sensors", [])
         actuators = message.get("actuators", [])
 
+        self.state.register_node(node_id, sensors, actuators, writer)
+
         logging.info(
             f"Node {node_id} registered from {peer} with "
             f"{len(sensors)} sensor(s) and {len(actuators)} actuator(s)"
         )
 
-        if self.state:
-            #server state integration goes here
-            pass
 
     async def _handle_register_panel(self, message: dict, writer: asyncio.StreamWriter, peer):
         """
