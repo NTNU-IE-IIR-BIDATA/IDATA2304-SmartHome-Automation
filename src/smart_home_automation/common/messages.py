@@ -1,5 +1,5 @@
 
-from .constants import MessageType, ErrorCode
+from .constants import ErrorCode, MessageType
 
 MESSAGE_SCHEMAS = {
     MessageType.REGISTER_NODE: {
@@ -53,7 +53,7 @@ class ProtocolError(Exception):
 
 def validate_message(message: dict):
     if "type" not in message:
-        raise ProtocolError(ErrorCode.INVALID_SCHEMA, f"Missing required field: type")
+        raise ProtocolError(ErrorCode.INVALID_SCHEMA, "Missing required field: type")
 
     msg_type = message.get("type")
 

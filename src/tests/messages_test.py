@@ -3,7 +3,6 @@ import pytest
 from smart_home_automation.common.constants import ErrorCode, MessageType
 from smart_home_automation.common.messages import ProtocolError, validate_message
 
-
 VALID_MESSAGES = [
     {
         "type": MessageType.REGISTER_NODE,
