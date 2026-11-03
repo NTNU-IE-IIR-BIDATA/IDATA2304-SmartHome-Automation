@@ -30,7 +30,7 @@ def decode_message(bytestring) -> dict:
     try:
         decoded = json.loads(bytestring.decode("utf-8").strip())
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
-        raise ProtocolError(ErrorCode.MALFORMED_JSON, str(e))
+        raise ProtocolError(ErrorCode.MALFORMED_JSON, str(e)) from e
 
     if not isinstance(decoded, dict):
         raise ProtocolError(ErrorCode.INVALID_SCHEMA, "Message must be a JSON object")

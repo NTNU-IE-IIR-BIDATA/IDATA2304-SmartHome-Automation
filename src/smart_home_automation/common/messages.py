@@ -1,4 +1,3 @@
-
 from .constants import ErrorCode, MessageType
 
 MESSAGE_SCHEMAS = {
@@ -45,11 +44,13 @@ MESSAGE_SCHEMAS = {
     },
 }
 
+
 class ProtocolError(Exception):
     def __init__(self, code: ErrorCode, message: str):
         super().__init__(message)
         self.code = code
         self.message = message
+
 
 def validate_message(message: dict):
     if "type" not in message:
@@ -60,21 +61,30 @@ def validate_message(message: dict):
     schema = MESSAGE_SCHEMAS.get(msg_type)
 
     if schema is None:
-        raise ProtocolError(ErrorCode.INVALID_SCHEMA, f"No schema defined for message type: {msg_type}")
+        raise ProtocolError(
+            ErrorCode.INVALID_SCHEMA,
+            f"No schema defined for message type: {msg_type}",
+        )
 
     for field_name, expected_type in schema.items():
         if field_name not in message:
-            raise ProtocolError(ErrorCode.INVALID_SCHEMA, f"Missing required field: {field_name}")
+            raise ProtocolError(
+                ErrorCode.INVALID_SCHEMA,
+                f"Missing required field: {field_name}",
+            )
 
         actual_value = message[field_name]
         if not isinstance(actual_value, expected_type):
             raise ProtocolError(
                 ErrorCode.INVALID_SCHEMA,
-                f"Invalid type for field {field_name}: expected {expected_type}, got {type(actual_value)}")
+                f"Invalid type for field {field_name}: "
+                f"expected {expected_type}, got {type(actual_value)}",
+            )
+
 
 def create_error_message(code: ErrorCode, message: str) -> dict:
     return {
         "type": MessageType.ERROR,
         "code": str(code),
-        "message": message
+        "message": message,
     }

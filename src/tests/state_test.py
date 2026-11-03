@@ -6,6 +6,7 @@ from smart_home_automation.common.messages import ProtocolError
 from smart_home_automation.server.server import Server
 from smart_home_automation.server.state import ServerState
 
+
 class TestServerState(unittest.TestCase):
 
     def setUp(self):

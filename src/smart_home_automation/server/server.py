@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from ..common.constants import DEFAULT_PORT, MessageType, ErrorCode
+from ..common.constants import DEFAULT_PORT, ErrorCode, MessageType
 from ..common.framing import decode_message, encode_message
 from ..common.messages import ProtocolError, create_error_message
 from .state import ServerState

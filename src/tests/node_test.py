@@ -4,6 +4,7 @@ import pytest
 
 from smart_home_automation.common.constants import ActuatorState, MessageType
 from smart_home_automation.common.framing import decode_message
+from smart_home_automation.node import create_default_node
 from smart_home_automation.node.actuators import (
     FanActuator,
     HeaterActuator,
@@ -17,6 +18,7 @@ from smart_home_automation.node.sensors import (
     TemperatureSensor,
     create_sensor,
 )
+from smart_home_automation.server.server import Server
 
 
 def test_device_factories_create_protocol_manifests():
@@ -54,6 +56,13 @@ def test_node_builds_register_node_message():
     }
 
 
+def test_create_default_node():
+    node = create_default_node()
+    assert node.node_id == "living_room_01"
+    assert len(node.sensors) == 2
+    assert len(node.actuators) == 1
+
+
 def test_node_sends_register_node_over_tcp():
     asyncio.run(_test_node_sends_register_node_over_tcp())
 
@@ -77,7 +86,62 @@ async def _test_node_sends_register_node_over_tcp():
 
     await node.register()
     await asyncio.sleep(0)
+    await node.disconnect()
     server.close()
     await server.wait_closed()
 
     assert received == [node.registration_message()]
+
+
+def test_node_server_end_to_end_handshake():
+    asyncio.run(_test_node_server_end_to_end_handshake())
+
+
+async def _test_node_server_end_to_end_handshake():
+    server = Server(host="127.0.0.1", port=0)
+    server_task = asyncio.create_task(server.start())
+
+    while server.server is None or not server.server.sockets:
+        await asyncio.sleep(0.01)
+
+    port = server.server.sockets[0].getsockname()[1]
+    node = SensorActuatorNode(
+        "living_room_01",
+        sensors=[TemperatureSensor("temp_1"), HumiditySensor("hum_1")],
+        actuators=[FanActuator("fan_1")],
+        port=port,
+    )
+
+    try:
+        await node.register()
+        assert node.is_connected is True
+
+        # Wait briefly for server to process registration
+        await asyncio.sleep(0.05)
+
+        stored = server.state.get_node("living_room_01")
+        assert stored is not None
+        assert stored["connected"] is True
+        assert len(stored["sensors"]) == 2
+        assert len(stored["actuators"]) == 1
+        assert server.state.get_connection("living_room_01") is not None
+
+        # Clean disconnect from client
+        await node.disconnect()
+        assert node.is_connected is False
+
+        # Wait briefly for server EOF handling
+        await asyncio.sleep(0.05)
+
+        updated = server.state.get_node("living_room_01")
+        assert updated is not None
+        assert updated["connected"] is False
+        assert server.state.get_connection("living_room_01") is None
+    finally:
+        await node.disconnect()
+        await server.stop()
+        server_task.cancel()
+        try:
+            await server_task
+        except (asyncio.CancelledError, Exception):
+            pass

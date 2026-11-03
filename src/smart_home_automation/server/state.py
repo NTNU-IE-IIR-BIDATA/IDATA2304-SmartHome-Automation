@@ -3,6 +3,7 @@ from copy import deepcopy
 from ..common.constants import ErrorCode, MessageType
 from ..common.messages import ProtocolError
 
+
 class ServerState:
 
     def __init__(self):

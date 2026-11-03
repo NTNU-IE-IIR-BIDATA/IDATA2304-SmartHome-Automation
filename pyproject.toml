@@ -7,7 +7,7 @@ dependencies= []
 
 [project.scripts]
 server = "smart_home_automation.server:main"
-sensor = "smart_home_automation.sensor:main"
+sensor = "smart_home_automation.node:main"
 control_panel = "smart_home_automation.control_panel:main"
 
 
