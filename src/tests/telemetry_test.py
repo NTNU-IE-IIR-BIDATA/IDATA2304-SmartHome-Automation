@@ -1,11 +1,10 @@
 import asyncio
 from unittest.mock import AsyncMock, Mock
 
-from smart_home_automation.common.framing import decode_message
-import pytest
-
-from smart_home_automation.node.node import SensorActuatorNode
 from smart_home_automation.common.constants import MessageType
+from smart_home_automation.common.framing import decode_message
+from smart_home_automation.node.node import SensorActuatorNode
+
 
 class FakeSensor:
     id = "door_1"

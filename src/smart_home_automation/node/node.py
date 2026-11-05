@@ -1,8 +1,8 @@
 import asyncio
 import logging
+import time
 from collections.abc import Sequence
 from typing import Self
-import time
 
 from smart_home_automation.common.constants import DEFAULT_PORT, MessageType
 from smart_home_automation.common.framing import encode_message

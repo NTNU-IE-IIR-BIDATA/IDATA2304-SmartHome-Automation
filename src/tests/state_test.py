@@ -2,9 +2,8 @@ import asyncio
 import json
 import unittest
 
-from smart_home_automation.common.constants import SensorType
+from smart_home_automation.common.constants import ErrorCode, SensorType
 from smart_home_automation.common.messages import ProtocolError
-from smart_home_automation.common.constants import ErrorCode
 from smart_home_automation.server.server import Server
 from smart_home_automation.server.state import ServerState
 
