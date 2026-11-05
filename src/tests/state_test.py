@@ -2,6 +2,7 @@ import asyncio
 import json
 import unittest
 
+from smart_home_automation.common.constants import SensorType
 from smart_home_automation.common.messages import ProtocolError
 from smart_home_automation.common.constants import ErrorCode
 from smart_home_automation.server.server import Server
@@ -13,7 +14,7 @@ class TestServerState(unittest.TestCase):
     def setUp(self):
         self.state = ServerState()
         self.connection = object()
-        self.sensors = [{"id": "temp_1", "type": "temperature", "unit": "celsius"}]
+        self.sensors = [{"id": "temp_1", "type": SensorType.TEMPERATURE.value, "unit": "celsius"}]
         self.actuators = [{"id": "fan_1", "type": "fan", "state": "OFF"}]
 
     def register(self, node_id="room", connection=None):
@@ -195,7 +196,10 @@ class TestStateTCP(unittest.IsolatedAsyncioTestCase):
             writers.append(first)
             registration = json.dumps({
                 "type": "REGISTER_NODE", "node_id": "room",
-                "sensors": [{"id": "temp_1", "type": "temperature"}], "actuators": [],
+                "sensors": [{
+                    "id": "temp_1",
+                    "type": SensorType.TEMPERATURE.value,
+                }], "actuators": [],
             }).encode() + b"\n"
             first.write(registration)
             await first.drain()

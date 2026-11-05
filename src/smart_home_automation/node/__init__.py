@@ -1,6 +1,8 @@
 import asyncio
 import logging
 
+from smart_home_automation.common.constants import SensorType
+
 from .actuators import create_actuator
 from .node import SensorActuatorNode, run_node
 from .sensors import create_sensor
@@ -11,8 +13,8 @@ def create_default_node() -> SensorActuatorNode:
     return SensorActuatorNode(
         node_id="living_room_01",
         sensors=[
-            create_sensor("temperature", "temp_1"),
-            create_sensor("humidity", "hum_1"),
+            create_sensor(SensorType.TEMPERATURE.value, "temp_1"),
+            create_sensor(SensorType.HUMIDITY.value, "hum_1"),
         ],
         actuators=[
             create_actuator("fan", "fan_1"),
