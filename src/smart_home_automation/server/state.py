@@ -58,5 +58,53 @@ class ServerState:
     def get_connection(self, node_id):
         return self._connections.get(node_id)
 
+    def get_sensor(self, node_id, sensor_id):
+        node = self.get_node(node_id)
+        if node is None:
+            return None
+        for sensor in node["sensors"]:
+            if sensor.get("id") == sensor_id:
+                return sensor
+        return None
+
+    def _find_sensor(self, node_id, sensor_id):
+        node = self._nodes.get(node_id)
+        if not node:
+            return None
+        for s in node["sensors"]:
+            if s.get("id") == sensor_id:
+                return s
+        return None
+
     def system_state(self):
         return {"type": MessageType.SYSTEM_STATE, "nodes": deepcopy(list(self._nodes.values()))}
+
+    def update_sensor_data(
+            self,
+            node_id,
+            sensor_id,
+            value,
+            unit=None,
+            timestamp=None,
+            connection=None
+    ):
+        if node_id not in self._nodes:
+            raise ProtocolError(ErrorCode.NODE_NOT_FOUND, f"Node {node_id} not found")
+
+        if connection is None or connection is not self.get_connection(node_id):
+            raise ProtocolError(ErrorCode.AUTH_FAILED, "Node id does not match connection")
+
+        target_sensor = self._find_sensor(node_id, sensor_id)
+
+        if target_sensor is None:
+            raise ProtocolError(
+                ErrorCode.INVALID_SCHEMA,
+                f"Sensor {sensor_id} not found on node {node_id}"
+            )
+
+        target_sensor["value"] = value
+
+        if unit is not None:
+            target_sensor["unit"] = unit
+        if timestamp is not None:
+            target_sensor["timestamp"] = timestamp
