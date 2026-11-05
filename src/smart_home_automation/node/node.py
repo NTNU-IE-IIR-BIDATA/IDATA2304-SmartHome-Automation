@@ -49,9 +49,6 @@ class SensorActuatorNode:
     def sensor_data_message(self, sensor: Sensor) -> dict:
         value = sensor.read_value()
 
-        if not isinstance(value, bool):
-            raise ValueError("Sensor value must be boolean")
-
         return {
             "type": MessageType.SENSOR_DATA,
             "node_id": self.node_id,
@@ -60,6 +57,7 @@ class SensorActuatorNode:
             "unit": sensor.unit,
             "timestamp": time.time(),
         }
+
     async def send_sensor_data(self) -> None:
         if not self.is_connected or self.writer is None:
             raise RuntimeError("Node is not connected")

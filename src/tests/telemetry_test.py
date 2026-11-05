@@ -15,18 +15,6 @@ class FakeSensor:
         return False
 
 
-@pytest.mark.parametrize("value", [0, 1, 23.5, "True", None])
-def test_sensor_data_rejects_non_boolean(value):
-    class InvalidSensor(FakeSensor):
-        def read_value(self):
-            return value
-
-    node = SensorActuatorNode(node_id="room")
-
-    with pytest.raises(
-            ValueError, match="Sensor value must be boolean"
-    ):
-        node.sensor_data_message(InvalidSensor())
 
 def test_sensor_data_message():
     node = SensorActuatorNode(node_id="room")
