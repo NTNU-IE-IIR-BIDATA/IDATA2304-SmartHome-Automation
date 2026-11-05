@@ -28,22 +28,33 @@ class Sensor:
 
 def _bounded_variation(value: float, minimum: float, maximum: float, step: float) -> float:
     """Return a realistic next reading without leaving the sensor's range."""
+
     next_value = value + random.uniform(-step, step)
-    return max(minimum, min(maximum, next_value))
+    if next_value < minimum:
+        return minimum
+
+    if next_value > maximum:
+        return maximum
+
+    return next_value
 
 
 
 class TemperatureSensor(Sensor):
+    """Simulate the temperature in degrees Celsius."""
+
     def __init__(self, sensor_id: str) -> None:
         Sensor.__init__(self, sensor_id, SensorType.TEMPERATURE.value, "celsius")
         self._value = 21.0
 
     def read_value(self) -> float:
-        self._value = _bounded_variation(self._value, 5.0, 35.0, 0.1)
+        self._value = _bounded_variation(self._value, 5.0, 35.0, 0.2)
         return round(self._value, 1)
 
 
 class HumiditySensor(Sensor):
+    """Simulate relative humidity as a percentage."""
+
     def __init__(self, sensor_id: str) -> None:
         Sensor.__init__(self, sensor_id, SensorType.HUMIDITY.value, "percent")
         self._value = 45.0
@@ -54,14 +65,18 @@ class HumiditySensor(Sensor):
 
 
 class SmokeDetector(Sensor):
+    """Simulate a smoke detector that rarely detects smoke."""
+
     def __init__(self, sensor_id: str) -> None:
         Sensor.__init__(self, sensor_id, SensorType.SMOKE.value, "boolean")
 
     def read_value(self) -> bool:
-        return random.random() < 0.01
+        return random.random() < 0.001
 
 
 class AirQualitySensor(Sensor):
+    """Simulate air quality using an Air Quality Index value."""
+
     def __init__(self, sensor_id: str) -> None:
         Sensor.__init__(self, sensor_id, SensorType.AIR_QUALITY.value, "aqi")
         self._value = 35.0
@@ -72,6 +87,8 @@ class AirQualitySensor(Sensor):
 
 
 class PowerSensor(Sensor):
+    """Simulate electrical power usage in watts."""
+
     def __init__(self, sensor_id: str) -> None:
         Sensor.__init__(self, sensor_id, SensorType.POWER.value, "watts")
         self._value = 900.0
@@ -82,6 +99,8 @@ class PowerSensor(Sensor):
 
 
 class MotionSensor(Sensor):
+    """Simulate a motion detector."""
+
     def __init__(self, sensor_id: str) -> None:
         Sensor.__init__(self, sensor_id, SensorType.MOTION.value, "boolean")
 
@@ -90,6 +109,8 @@ class MotionSensor(Sensor):
 
 
 class LeakDetector(Sensor):
+    """Simulate a leak detector that rarely detects a leak."""
+
     def __init__(self, sensor_id: str) -> None:
         Sensor.__init__(self, sensor_id, SensorType.LEAK.value, "boolean")
 
@@ -99,6 +120,7 @@ class LeakDetector(Sensor):
 
 
 def create_sensor(sensor_type: str, sensor_id: str) -> Sensor:
+    """Create the sensor implementation matching the requested type."""
     sensors = {
         SensorType.TEMPERATURE.value: TemperatureSensor,
         SensorType.HUMIDITY.value: HumiditySensor,
