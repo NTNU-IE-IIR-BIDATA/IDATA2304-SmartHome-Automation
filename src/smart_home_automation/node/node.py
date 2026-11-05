@@ -2,6 +2,7 @@ import asyncio
 import logging
 from collections.abc import Sequence
 from typing import Self
+import time
 
 from smart_home_automation.common.constants import DEFAULT_PORT, MessageType
 from smart_home_automation.common.framing import encode_message
@@ -45,6 +46,35 @@ class SensorActuatorNode:
             "actuators": [actuator.manifest() for actuator in self.actuators],
         }
 
+    def sensor_data_message(self, sensor: Sensor) -> dict:
+        value = sensor.read_value()
+
+        if not isinstance(value, bool):
+            raise ValueError("Sensor value must be boolean")
+
+        return {
+            "type": MessageType.SENSOR_DATA,
+            "node_id": self.node_id,
+            "sensor_id": sensor.id,
+            "value": value,
+            "unit": sensor.unit,
+            "timestamp": time.time(),
+        }
+    async def send_sensor_data(self) -> None:
+        if not self.is_connected or self.writer is None:
+            raise RuntimeError("Node is not connected")
+
+        for sensor in self.sensors:
+            message = self.sensor_data_message(sensor)
+            self.writer.write(encode_message(message))
+            await self.writer.drain()
+
+    async def telemetry_loop(self) -> None:
+        while self ._running and self .is_connected:
+            await self.send_sensor_data()
+            await asyncio.sleep(5)
+
+
     async def connect(self) -> None:
         """Establish TCP connection to the server if not already connected."""
         if self.is_connected:
@@ -80,19 +110,34 @@ class SensorActuatorNode:
                 logging.info(f"Node '{self.node_id}' disconnected")
 
     async def run(self) -> None:
-        """Main SAN event loop: register and stay connected listening for messages."""
+        """Register the node, then send and receive concurrently"""
         self._running = True
-        await self.register()
+
         try:
-            while self._running and self.is_connected and self.reader is not None:
-                line = await self.reader.readline()
-                if not line:
-                    logging.info(f"Server closed connection to node '{self.node_id}' (EOF)")
-                    break
-        except asyncio.CancelledError:
-            pass
+            await self.register()
+
+            async with asyncio.TaskGroup() as tasks:
+                telemetry_task = tasks.create_task(
+                    self.telemetry_loop()
+                )
+
+                while (
+                    self._running
+                    and self.is_connected
+                    and self.reader is not None
+                ):
+                    line = await self.reader.readline()
+
+                    if not line:
+                        logging.info("Server closed the connection")
+                        break
+
+                telemetry_task.cancel()
+
         finally:
+            self._running = False
             await self.disconnect()
+
 
     def stop(self) -> None:
         """Signal SAN loop to stop."""
