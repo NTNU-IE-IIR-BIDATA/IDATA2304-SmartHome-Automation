@@ -1,6 +1,6 @@
 import pytest
 
-from smart_home_automation.common.constants import ErrorCode, MessageType
+from smart_home_automation.common.constants import ErrorCode, MessageType, SensorType
 from smart_home_automation.common.messages import ProtocolError, validate_message
 
 VALID_MESSAGES = [
@@ -8,7 +8,7 @@ VALID_MESSAGES = [
         "type": MessageType.REGISTER_NODE,
         "node_id": "living_room_01",
         "sensors": [
-            {"id": "temp_1", "type": "temperature", "unit": "celsius"},
+            {"id": "temp_1", "type": SensorType.TEMPERATURE.value, "unit": "celsius"},
         ],
         "actuators": [
             {"id": "fan_1", "type": "fan", "state": "OFF"},

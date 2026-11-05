@@ -32,3 +32,12 @@ class ActuatorState(StrEnum):
     OFF = "OFF"
     OPEN = "OPEN"
     CLOSED = "CLOSED"
+
+class SensorType(StrEnum):
+    TEMPERATURE = "temperature"
+    HUMIDITY = "humidity"
+    SMOKE = "smoke"
+    AIR_QUALITY = "air_quality"
+    POWER = "power"
+    MOTION = "motion"
+    LEAK = "leak"

@@ -2,7 +2,7 @@ import asyncio
 import functools
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from smart_home_automation.common.constants import ErrorCode, MessageType
+from smart_home_automation.common.constants import ErrorCode, MessageType, SensorType
 from smart_home_automation.common.framing import decode_message, encode_message
 from smart_home_automation.server.server import Server
 
@@ -156,7 +156,11 @@ class TestServerIntegration:
             reg_msg = {
                 "type": MessageType.REGISTER_NODE,
                 "node_id": "living_room_01",
-                "sensors": [{"id": "temp_1", "type": "temperature", "unit": "celsius"}],
+                "sensors": [{
+                    "id": "temp_1",
+                    "type": SensorType.TEMPERATURE.value,
+                    "unit": "celsius",
+                }],
                 "actuators": [{"id": "fan_1", "type": "fan", "state": "OFF"}],
             }
             writer.write(encode_message(reg_msg))
