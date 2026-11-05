@@ -100,6 +100,49 @@ class TestServerUnit:
             await server._dispatch_message(panel_msg, mock_writer, ("127.0.0.1", 12345))
             mock_handler.assert_awaited_once_with(panel_msg, mock_writer, ("127.0.0.1", 12345))
 
+    @async_test
+    async def test_dispatch_routes_to_sensor_data(self):
+        """Verify _dispatch_message routes SENSOR_DATA correctly"""
+        server = Server()
+        mock_writer = MagicMock()
+        sensor_msg = {
+            "type": MessageType.SENSOR_DATA,
+            "node_id": "test_node_1",
+            "sensor_id": "temp_1",
+            "value": 22
+        }
+
+        with patch.object(server, "_handle_sensor_data", new_callable=AsyncMock) as mock_handler:
+            await server._dispatch_message(sensor_msg, mock_writer, ("127.0.0.1", 12345))
+            mock_handler.assert_awaited_once_with(sensor_msg, mock_writer, ("127.0.0.1", 12345))
+
+    @async_test
+    async def test_handle_sensor_data_calls_state(self):
+        """Verify _handle_sensor_data takes out data from fields and updates server state"""
+
+        server = Server()
+        server.state = MagicMock()
+        mock_writer = MagicMock()
+
+        sensor_msg = {
+            "type": MessageType.SENSOR_DATA,
+            "node_id": "test_node_1",
+            "sensor_id": "temp_1",
+            "value": 25.9,
+            "unit": "celsius",
+            "timestamp": 12343212
+        }
+
+        await server._handle_sensor_data(sensor_msg, mock_writer, ("127.0.0.1", 12345))
+        server.state.update_sensor_data.assert_called_once_with(
+            node_id = "test_node_1",
+            sensor_id = "temp_1",
+            value = 25.9,
+            unit = "celsius",
+            timestamp = 12343212,
+            connection = mock_writer
+        )
+
 
 class TestServerIntegration:
     """Integration tests: spin up server on port 0 and connect real TCP clients."""

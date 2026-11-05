@@ -76,7 +76,7 @@ class Server:
             line = await reader.readline()
 
             if not line:
-                logging.info(f"Client {peer} disconnected (EOF)")
+                logging.info(f"Client {peer} disconnected")
                 break
 
             try:
@@ -102,13 +102,42 @@ class Server:
         """
 
         msg_type = message.get("type")
+        match msg_type:
+            case MessageType.REGISTER_NODE:
+                await self._handle_register_node(message, writer, peer)
 
-        if msg_type == MessageType.REGISTER_NODE:
-            await self._handle_register_node(message, writer, peer)
-        elif msg_type == MessageType.REGISTER_PANEL:
-            await self._handle_register_panel(message, writer, peer)
-        else:
-            logging.warning(f"Unhandled message type {msg_type} from {peer}")
+            case MessageType.REGISTER_PANEL:
+                await self._handle_register_panel(message, writer, peer)
+
+            case MessageType.SENSOR_DATA:
+                await self._handle_sensor_data(message, writer, peer)
+
+            case _:
+                logging.warning(f"Unhandled message type {msg_type} from {peer}")
+
+    async def _handle_sensor_data(self, message, writer, peer):
+        """
+        Handle SENSOR_DATA messages from a Sensor-Actuator-Node
+        :param message:
+        :param writer:
+        :param peer:
+        :return:
+        """
+        node_id = message["node_id"]
+        sensor_id = message["sensor_id"]
+        value = message["value"]
+        unit = message.get("unit")
+        timestamp = message.get("timestamp")
+
+        self.state.update_sensor_data(
+            node_id=node_id,
+            sensor_id=sensor_id,
+            value=value,
+            unit=unit,
+            timestamp=timestamp,
+            connection=writer
+        )
+        logging.info(f"Sensor data from {node_id}.{sensor_id}: {value} {unit or ''}".strip())
 
     async def _handle_register_node(self, message: dict, writer: asyncio.StreamWriter, peer):
         """

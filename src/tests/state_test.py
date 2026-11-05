@@ -3,6 +3,7 @@ import json
 import unittest
 
 from smart_home_automation.common.messages import ProtocolError
+from smart_home_automation.common.constants import ErrorCode
 from smart_home_automation.server.server import Server
 from smart_home_automation.server.state import ServerState
 
@@ -20,6 +21,85 @@ class TestServerState(unittest.TestCase):
             node_id, self.sensors, self.actuators,
             self.connection if connection is None else connection,
         )
+
+    def test_get_sensor(self):
+        self.register()
+
+        sensor = self.state.get_sensor("room", "temp_1")
+        self.assertIsNotNone(sensor)
+        self.assertEqual(sensor["id"], "temp_1")
+        self.assertEqual(sensor["unit"], "celsius")
+
+        # sensor not found
+        self.assertIsNone(self.state.get_sensor("room", "temp_2"))
+
+        # node not found
+        self.assertIsNone(self.state.get_sensor("bedroom", "temp_1"))
+
+
+    def test_update_sensor_data_success(self):
+        self.register()
+
+        self.state.update_sensor_data(
+            node_id="room",
+            sensor_id="temp_1",
+            value=23,
+            unit="celsius",
+            timestamp=1234567543,
+            connection=self.connection
+        )
+        sensor = self.state.get_sensor("room", "temp_1")
+
+        self.assertEqual(sensor["value"], 23)
+        self.assertEqual(sensor["unit"], "celsius")
+        self.assertEqual(sensor["timestamp"], 1234567543)
+
+    def test_update_sensor_data_node_not_found(self):
+        with self.assertRaises(ProtocolError) as ctx:
+            self.state.update_sensor_data(
+                node_id="no_room",
+                sensor_id="temp_1",
+                value=20.1,
+                connection=self.connection
+            )
+        self.assertEqual(ctx.exception.code, ErrorCode.NODE_NOT_FOUND)
+
+    def test_update_sensor_data_auth_failed(self):
+        self.register()
+        wrong_conn = object()
+
+        # wrong connection
+        with self.assertRaises(ProtocolError) as ctx:
+            self.state.update_sensor_data(
+                node_id="room",
+                sensor_id="temp_1",
+                value=20.1,
+                connection=wrong_conn
+            )
+        self.assertEqual(ctx.exception.code, ErrorCode.AUTH_FAILED)
+
+        # missing connection
+        with self.assertRaises(ProtocolError) as ctx:
+            self.state.update_sensor_data(
+                node_id="room",
+                sensor_id="temp_1",
+                value=20.1,
+                connection=None
+            )
+        self.assertEqual(ctx.exception.code, ErrorCode.AUTH_FAILED)
+
+    def test_update_sensor_data_sensor_not_found(self):
+        self.register()
+
+        with self.assertRaises(ProtocolError) as ctx:
+            self.state.update_sensor_data(
+                node_id="room",
+                sensor_id="no_sensor",
+                value=20.1,
+                connection=self.connection
+            )
+
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_SCHEMA)
 
     def test_empty_snapshot(self):
         self.assertEqual(self.state.system_state(), {"type": "SYSTEM_STATE", "nodes": []})
