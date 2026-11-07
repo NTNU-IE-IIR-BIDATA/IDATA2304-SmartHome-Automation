@@ -3,11 +3,13 @@
 name="smart-home-automation"
 version= "0.1.0"
 requires-python= ">=3.15,<3.16"
-dependencies= []
+dependencies= [
+    "textual>=8.2.8",
+]
 
 [project.scripts]
 server = "smart_home_automation.server:main"
-sensor = "smart_home_automation.node:main"
+node = "smart_home_automation.node:main"
 control_panel = "smart_home_automation.control_panel:main"
 
 

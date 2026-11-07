@@ -41,3 +41,14 @@ class SensorType(StrEnum):
     POWER = "power"
     MOTION = "motion"
     LEAK = "leak"
+
+class AnomalySeverity(StrEnum):
+    WARNING = "WARNING"
+    CRITICAL = "CRITICAL"
+
+class AnomalyThresholdLabels(StrEnum):
+    WARNING_MIN = "WARNING_MIN"
+    WARNING_MAX = "WARNING_MAX"
+    CRITICAL_MIN = "CRITICAL_MIN"
+    CRITICAL_MAX = "CRITICAL_MAX"
+
