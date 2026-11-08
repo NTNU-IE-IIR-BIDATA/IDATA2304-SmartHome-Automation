@@ -1,3 +1,4 @@
+import operator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -53,7 +54,21 @@ class AnomalyDetector:
         }
     }
 
-    def evaluate(self, node_id: str, sensor_id: str, sensor_type: SensorType, value: str | int | float | bool, unit: str) -> Optional[Anomaly]:
+    CHECKS = (
+        (AnomalyThresholdLabels.CRITICAL_MAX, operator.gt, AnomalySeverity.CRITICAL, "is over threshold"),
+        (AnomalyThresholdLabels.CRITICAL_MIN, operator.lt, AnomalySeverity.CRITICAL, "is under threshold"),
+        (AnomalyThresholdLabels.WARNING_MAX, operator.gt, AnomalySeverity.WARNING, "is over threshold"),
+        (AnomalyThresholdLabels.WARNING_MIN, operator.lt, AnomalySeverity.WARNING, "is under threshold")
+    )
+
+    def evaluate(
+        self,
+        node_id: str,
+        sensor_id: str,
+        sensor_type: SensorType,
+        value: str | int | float | bool,
+        unit: str,
+    ) -> Optional[Anomaly]:
         """
         Evaluate sensor data against set thresholds. Returns an anomaly if the value exceeds the min/max
         :param sensor_type: type of the sensor
@@ -64,30 +79,75 @@ class AnomalyDetector:
         :return: Anomaly if value exceeds threshold. None otherwise
         """
 
-        if type(value) == int | type(value) == float: # Numerical value
-            if value > self.NUMERICAL_THRESHOLDS[sensor_type][AnomalyThresholdLabels.CRITICAL_MAX]:
-                raise NotImplemented
+        if isinstance(value, bool): # boolean value
+            violation = self._evaluate_boolean(value, sensor_type)
+            if violation is not None:
+                severity, description = violation
+                return self._create_anomaly(
+                    node_id=node_id,
+                    sensor_id=sensor_id,
+                    value=value,
+                    unit=unit,
+                    severity=severity,
+                    message=f"Sensor alert from {node_id}.{sensor_id} ({sensor_type.value}): {description}",
+                )
+            return None
 
-            if value < self.NUMERICAL_THRESHOLDS[sensor_type][AnomalyThresholdLabels.CRITICAL_MIN]:
-                raise NotImplemented
+        if isinstance(value, (int, float)): # numerical value
+            violation = self._evaluate_numerical(value, sensor_type)
+            if violation is not None:
+                severity, description, threshold = violation
+                return self._create_anomaly(
+                    node_id=node_id,
+                    sensor_id=sensor_id,
+                    value=value,
+                    unit=unit,
+                    severity=severity,
+                    message=f"Sensor data from {node_id}.{sensor_id} {value} {unit} {description} {threshold}",
+                )
+            return None
 
-            if value > self.NUMERICAL_THRESHOLDS[sensor_type][AnomalyThresholdLabels.WARNING_MAX]:
-                raise NotImplemented
+        return None
 
-            if value > self.NUMERICAL_THRESHOLDS[sensor_type][AnomalyThresholdLabels.WARNING_MIN]:
-                raise NotImplemented
+    def _evaluate_numerical(
+        self, value: int | float, sensor_type: SensorType
+    ) -> Optional[tuple[AnomalySeverity, str, int | float]]:
+        thresholds = self.NUMERICAL_THRESHOLDS.get(sensor_type)
+        if thresholds is None:
+            return None
 
-        if type(value) == bool: # boolean value
-            raise NotImplemented
+        for label, op, severity, description in self.CHECKS:
+            threshold = thresholds.get(label)
+            if threshold is None:
+                continue
 
-    def _create_anomaly(self,
-                        node_id: str,
-                        sensor_id: str,
-                        value: str | int | float | bool,
-                        unit: str,
-                        message: str,
-                        severity: AnomalySeverity
-                        ) -> Anomaly:
+            if op(value, threshold):
+                return (severity, description, threshold)
+
+        return None
+
+    def _evaluate_boolean(
+        self, value: bool, sensor_type: SensorType
+    ) -> Optional[tuple[AnomalySeverity, str]]:
+        rules = self.BOOLEAN_THRESHOLDS.get(sensor_type)
+        if rules is None:
+            return None
+
+        for severity, trigger_value in rules.items():
+            if value == trigger_value:
+                return severity, f"detected alert state ({value})"
+
+        return None
+
+    def _create_anomaly(
+        self,
+        node_id: str,
+        sensor_id: str,
+        value: str | int | float | bool,
+        unit: str,
+        message: str,
+        severity: AnomalySeverity,
+    ) -> Anomaly:
         return Anomaly(
             node_id=node_id,
             sensor_id=sensor_id,
@@ -95,18 +155,5 @@ class AnomalyDetector:
             unit=unit,
             severity=severity,
             message=message,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
-
-    """
-    have some value thresholds to check against
-    evaluate against those thresholds
-    if over critical, return critical anomaly
-    if over warning, return warning anomaly
-    else, return nothing
-    
-    how to check against boolean values?
-    sensor type dict containing sensor type
-    
-    check first if sensor data is numerical or boolean. if it is none, we do nothing
-    """
