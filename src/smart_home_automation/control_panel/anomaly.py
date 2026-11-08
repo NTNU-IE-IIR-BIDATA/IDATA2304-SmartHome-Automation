@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from ..common.constants import AnomalySeverity, AnomalyThresholdLabels, SensorType
 
-from ..common.constants import AnomalySeverity, SensorType, AnomalyThresholdLabels
 
 @dataclass
 class Anomaly:
@@ -16,49 +16,65 @@ class Anomaly:
     severity: AnomalySeverity
     timestamp: datetime
 
-class AnomalyDetector:
 
+class AnomalyDetector:
     NUMERICAL_THRESHOLDS = {
         SensorType.TEMPERATURE: {
             AnomalyThresholdLabels.WARNING_MIN: 10,
             AnomalyThresholdLabels.WARNING_MAX: 35,
             AnomalyThresholdLabels.CRITICAL_MIN: 5,
-            AnomalyThresholdLabels.CRITICAL_MAX: 50
+            AnomalyThresholdLabels.CRITICAL_MAX: 50,
         },
         SensorType.HUMIDITY: {
             AnomalyThresholdLabels.WARNING_MIN: 20,
             AnomalyThresholdLabels.WARNING_MAX: 75,
             AnomalyThresholdLabels.CRITICAL_MIN: 10,
-            AnomalyThresholdLabels.CRITICAL_MAX: 90
+            AnomalyThresholdLabels.CRITICAL_MAX: 90,
         },
         SensorType.POWER: {
             AnomalyThresholdLabels.WARNING_MIN: None,
             AnomalyThresholdLabels.WARNING_MAX: 4000.0,
             AnomalyThresholdLabels.CRITICAL_MIN: None,
-            AnomalyThresholdLabels.CRITICAL_MAX: 10000.0
+            AnomalyThresholdLabels.CRITICAL_MAX: 10000.0,
         },
         SensorType.AIR_QUALITY: {
             AnomalyThresholdLabels.WARNING_MIN: None,
             AnomalyThresholdLabels.WARNING_MAX: 150,
             AnomalyThresholdLabels.CRITICAL_MIN: None,
-            AnomalyThresholdLabels.CRITICAL_MAX:200
-        }
+            AnomalyThresholdLabels.CRITICAL_MAX: 200,
+        },
     }
 
     BOOLEAN_THRESHOLDS = {
-        SensorType.SMOKE: {
-            AnomalySeverity.CRITICAL: True
-        },
-        SensorType.LEAK: {
-            AnomalySeverity.CRITICAL: True
-        }
+        SensorType.SMOKE: {AnomalySeverity.CRITICAL: True},
+        SensorType.LEAK: {AnomalySeverity.CRITICAL: True},
     }
 
     CHECKS = (
-        (AnomalyThresholdLabels.CRITICAL_MAX, operator.gt, AnomalySeverity.CRITICAL, "is over threshold"),
-        (AnomalyThresholdLabels.CRITICAL_MIN, operator.lt, AnomalySeverity.CRITICAL, "is under threshold"),
-        (AnomalyThresholdLabels.WARNING_MAX, operator.gt, AnomalySeverity.WARNING, "is over threshold"),
-        (AnomalyThresholdLabels.WARNING_MIN, operator.lt, AnomalySeverity.WARNING, "is under threshold")
+        (
+            AnomalyThresholdLabels.CRITICAL_MAX,
+            operator.gt,
+            AnomalySeverity.CRITICAL,
+            "is over threshold",
+        ),
+        (
+            AnomalyThresholdLabels.CRITICAL_MIN,
+            operator.lt,
+            AnomalySeverity.CRITICAL,
+            "is under threshold",
+        ),
+        (
+            AnomalyThresholdLabels.WARNING_MAX,
+            operator.gt,
+            AnomalySeverity.WARNING,
+            "is over threshold",
+        ),
+        (
+            AnomalyThresholdLabels.WARNING_MIN,
+            operator.lt,
+            AnomalySeverity.WARNING,
+            "is under threshold",
+        ),
     )
 
     def evaluate(
@@ -70,7 +86,8 @@ class AnomalyDetector:
         unit: str,
     ) -> Optional[Anomaly]:
         """
-        Evaluate sensor data against set thresholds. Returns an anomaly if the value exceeds the min/max
+        Evaluate sensor data against set thresholds.
+        Returns an anomaly if the value exceeds the min/max.
         :param sensor_type: type of the sensor
         :param node_id: id of the node
         :param sensor_id: id of the sensor
@@ -79,7 +96,7 @@ class AnomalyDetector:
         :return: Anomaly if value exceeds threshold. None otherwise
         """
 
-        if isinstance(value, bool): # boolean value
+        if isinstance(value, bool):  # boolean value
             violation = self._evaluate_boolean(value, sensor_type)
             if violation is not None:
                 severity, description = violation
@@ -89,11 +106,14 @@ class AnomalyDetector:
                     value=value,
                     unit=unit,
                     severity=severity,
-                    message=f"Sensor alert from {node_id}.{sensor_id} ({sensor_type.value}): {description}",
+                    message=(
+                        f"Sensor alert from {node_id}.{sensor_id} "
+                        f"({sensor_type.value}): {description}"
+                    ),
                 )
             return None
 
-        if isinstance(value, (int, float)): # numerical value
+        if isinstance(value, (int, float)):  # numerical value
             violation = self._evaluate_numerical(value, sensor_type)
             if violation is not None:
                 severity, description, threshold = violation
@@ -103,7 +123,10 @@ class AnomalyDetector:
                     value=value,
                     unit=unit,
                     severity=severity,
-                    message=f"Sensor data from {node_id}.{sensor_id} {value} {unit} {description} {threshold}",
+                    message=(
+                        f"Sensor data from {node_id}.{sensor_id} "
+                        f"{value} {unit} {description} {threshold}"
+                    ),
                 )
             return None
 

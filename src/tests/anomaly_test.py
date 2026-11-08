@@ -1,12 +1,11 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime
 
 from smart_home_automation.common.constants import AnomalySeverity, SensorType
-from smart_home_automation.control_panel.anomaly import AnomalyDetector, Anomaly
+from smart_home_automation.control_panel.anomaly import Anomaly, AnomalyDetector
 
 
 class TestAnomalyDetector(unittest.TestCase):
-
     def setUp(self):
         self.detector = AnomalyDetector()
 
@@ -16,9 +15,7 @@ class TestAnomalyDetector(unittest.TestCase):
             self.detector.evaluate("node_1", "temp_1", SensorType.TEMPERATURE, 21.5, "°C")
         )
         # Humidity within [20, 75]
-        self.assertIsNone(
-            self.detector.evaluate("node_1", "hum_1", SensorType.HUMIDITY, 45.0, "%")
-        )
+        self.assertIsNone(self.detector.evaluate("node_1", "hum_1", SensorType.HUMIDITY, 45.0, "%"))
         # Power under 4000.0
         self.assertIsNone(
             self.detector.evaluate("node_1", "power_1", SensorType.POWER, 1500.0, "W")
@@ -38,9 +35,7 @@ class TestAnomalyDetector(unittest.TestCase):
         self.assertIn("is over threshold", anomaly_high.message)
 
         # Temp slightly below WARNING_MIN (10)
-        anomaly_low = self.detector.evaluate(
-            "node_1", "temp_1", SensorType.TEMPERATURE, 8.0, "°C"
-        )
+        anomaly_low = self.detector.evaluate("node_1", "temp_1", SensorType.TEMPERATURE, 8.0, "°C")
         self.assertIsNotNone(anomaly_low)
         self.assertEqual(anomaly_low.severity, AnomalySeverity.WARNING)
         self.assertIn("is under threshold", anomaly_low.message)
@@ -62,36 +57,24 @@ class TestAnomalyDetector(unittest.TestCase):
 
     def test_numerical_sensors_with_none_thresholds(self):
         # Power sensor has no minimum thresholds
-        self.assertIsNone(
-            self.detector.evaluate("node_1", "power_1", SensorType.POWER, 0.0, "W")
-        )
+        self.assertIsNone(self.detector.evaluate("node_1", "power_1", SensorType.POWER, 0.0, "W"))
         # Power above CRITICAL_MAX (10000.0)
-        power_crit = self.detector.evaluate(
-            "node_1", "power_1", SensorType.POWER, 12000.0, "W"
-        )
+        power_crit = self.detector.evaluate("node_1", "power_1", SensorType.POWER, 12000.0, "W")
         self.assertIsNotNone(power_crit)
         self.assertEqual(power_crit.severity, AnomalySeverity.CRITICAL)
 
     def test_boolean_sensor_detection(self):
         # Smoke normal
-        self.assertIsNone(
-            self.detector.evaluate("node_1", "smoke_1", SensorType.SMOKE, False, "")
-        )
+        self.assertIsNone(self.detector.evaluate("node_1", "smoke_1", SensorType.SMOKE, False, ""))
         # Smoke triggered
-        smoke_anomaly = self.detector.evaluate(
-            "node_1", "smoke_1", SensorType.SMOKE, True, ""
-        )
+        smoke_anomaly = self.detector.evaluate("node_1", "smoke_1", SensorType.SMOKE, True, "")
         self.assertIsNotNone(smoke_anomaly)
         self.assertEqual(smoke_anomaly.severity, AnomalySeverity.CRITICAL)
 
         # Leak normal
-        self.assertIsNone(
-            self.detector.evaluate("node_1", "leak_1", SensorType.LEAK, False, "")
-        )
+        self.assertIsNone(self.detector.evaluate("node_1", "leak_1", SensorType.LEAK, False, ""))
         # Leak triggered
-        leak_anomaly = self.detector.evaluate(
-            "node_1", "leak_1", SensorType.LEAK, True, ""
-        )
+        leak_anomaly = self.detector.evaluate("node_1", "leak_1", SensorType.LEAK, True, "")
         self.assertIsNotNone(leak_anomaly)
         self.assertEqual(leak_anomaly.severity, AnomalySeverity.CRITICAL)
 
@@ -113,11 +96,9 @@ class TestAnomalyDetector(unittest.TestCase):
 
     def test_sensor_without_thresholds_returns_none(self):
         # Motion sensor has no configured thresholds
-        result = self.detector.evaluate(
-            "node_1", "motion_1", SensorType.MOTION, True, ""
-        )
+        result = self.detector.evaluate("node_1", "motion_1", SensorType.MOTION, True, "")
         self.assertIsNone(result)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

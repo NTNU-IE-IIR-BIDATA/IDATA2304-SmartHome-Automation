@@ -8,8 +8,7 @@ from .state import ServerState
 
 
 class Server:
-
-    def __init__(self, host: str ="127.0.0.1", port: int =DEFAULT_PORT, state=None):
+    def __init__(self, host: str = "127.0.0.1", port: int = DEFAULT_PORT, state=None):
         self.host = host
         self.port = port
         self.state = state if state is not None else ServerState()
@@ -20,11 +19,7 @@ class Server:
         Start the server
         :return:
         """
-        self.server = await asyncio.start_server(
-            self.handle_client,
-            self.host,
-            self.port
-        )
+        self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
 
         addrs = ", ".join(str(sock.getsockname()) for sock in self.server.sockets)
         logging.info(f"Server listening on {addrs}")
@@ -91,7 +86,6 @@ class Server:
             except ProtocolError as err:
                 await self._send_error(writer, err.code, err.message)
 
-
     async def _dispatch_message(self, message: dict, writer: asyncio.StreamWriter, peer):
         """
         Route a validated protocol message to its corresponding handler
@@ -135,7 +129,7 @@ class Server:
             value=value,
             unit=unit,
             timestamp=timestamp,
-            connection=writer
+            connection=writer,
         )
         logging.info(f"Sensor data from {node_id}.{sensor_id}: {value} {unit or ''}".strip())
 
@@ -158,7 +152,6 @@ class Server:
             f"Node {node_id} registered from {peer} with "
             f"{len(sensors)} sensor(s) and {len(actuators)} actuator(s)"
         )
-
 
     async def _handle_register_panel(self, message: dict, writer: asyncio.StreamWriter, peer):
         """
