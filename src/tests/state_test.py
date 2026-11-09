@@ -175,6 +175,37 @@ class TestServerState(unittest.TestCase):
                 with self.assertRaises(ProtocolError):
                     self.register(node_id)
 
+    def test_register_and_disconnect_panel(self):
+        connection = object()
+
+        self.state.register_panel("panel_1", "OWNER", connection)
+
+        self.assertEqual(
+            self.state.get_panel_connections(),
+            [connection],
+        )
+
+        result = self.state.disconnect(connection)
+
+        self.assertEqual(result, "panel_1")
+        self.assertEqual(self.state.get_panel_connections(), [])
+
+    def test_duplicate_panel_keeps_original_connection(self):
+        first = object()
+        second = object()
+
+        self.state.register_panel("panel_1", "OWNER", first)
+
+        with self.assertRaises(ProtocolError):
+            self.state.register_panel("panel_1", "OWNER", second)
+
+        self.state.disconnect(second)
+
+        self.assertEqual(
+            self.state.get_panel_connections(),
+            [first],
+        )
+
 class TestStateTCP(unittest.IsolatedAsyncioTestCase):
 
     async def test_registration_duplicate_and_disconnect(self):

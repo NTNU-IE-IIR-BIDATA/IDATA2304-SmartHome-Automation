@@ -143,6 +143,111 @@ class TestServerUnit:
             connection = mock_writer
         )
 
+    @async_test
+    async def test_register_panel_sends_system_state(self):
+        server = Server()
+        node_connection = object()
+
+        server.state.register_node(
+            "room",
+            [{"id": "temp_1", "type": "temperature", "unit": "celsius"}],
+            [],
+            node_connection
+        )
+
+        writer = MagicMock()
+        writer.drain = AsyncMock()
+
+        message = {
+            "type": MessageType.REGISTER_PANEL,
+            "client_id": "panel_01",
+            "role": "OWNER"
+        }
+
+        await server._handle_register_panel(
+            message, writer, ("127.0.0.1", 12345)
+        )
+
+        writer.write.assert_called_once()
+        sent = decode_message(writer.write.call_args.args[0])
+
+        assert sent == server.state.system_state()
+        assert sent["nodes"][0]["node_id"] == "room"
+        assert server.state.get_panel_connections() == [writer]
+        writer.drain.assert_awaited_once()
+
+    @async_test
+    async def test_sensor_data_reaches_all_panels(self):
+        server = Server()
+        node_connection = object()
+
+        server.state.register_node(
+            "room",
+            [{"id": "temp_1", "type": "temperature", "unit": "celsius"}],
+            [],
+            node_connection,
+        )
+
+        panels = []
+        for client_id in ["panel_1", "panel_2"]:
+            writer = MagicMock()
+            writer.drain = AsyncMock()
+            server.state.register_panel(client_id, "OWNER", writer)
+            panels.append(writer)
+
+        message = {
+            "type": MessageType.SENSOR_DATA,
+            "node_id": "room",
+            "sensor_id": "temp_1",
+            "value": 22.5,
+            "unit": "celsius",
+            "timestamp": 123.0,
+        }
+
+        await server._handle_sensor_data(
+            message, node_connection, ("127.0.0.1", 12345)
+        )
+
+        sensor = server.state.get_sensor("room", "temp_1")
+        assert sensor["value"] == 22.5
+
+        for writer in panels:
+            writer.write.assert_called_once()
+            sent = decode_message(writer.write.call_args.args[0])
+            assert sent == message
+            writer.drain.assert_awaited_once()
+
+    @async_test
+    async def test_broadcast_continues_after_panel_failure(self):
+        server = Server()
+
+        broken = MagicMock()
+        broken.drain = AsyncMock(side_effect=ConnectionResetError())
+
+        healthy = MagicMock()
+        healthy.drain = AsyncMock()
+
+        server.state.register_panel("broken", "OWNER", broken)
+        server.state.register_panel("healthy", "OWNER", healthy)
+
+        message = {
+            "type": MessageType.SENSOR_DATA,
+            "node_id": "room",
+            "sensor_id": "temp_1",
+            "value": 22.5,
+            "unit": "celsius",
+            "timestamp": 123.0,
+        }
+
+        await server._broadcast_sensor_data(message)
+
+        assert server.state.get_panel_connections() == [healthy]
+        broken.close.assert_called_once()
+
+        healthy.write.assert_called_once()
+        sent = decode_message(healthy.write.call_args.args[0])
+        assert sent == message
+        healthy.drain.assert_awaited_once()
 
 class TestServerIntegration:
     """Integration tests: spin up server on port 0 and connect real TCP clients."""
