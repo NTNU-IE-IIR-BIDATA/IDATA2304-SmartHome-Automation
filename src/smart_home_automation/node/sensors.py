@@ -17,7 +17,6 @@ class Sensor:
         self.type = sensor_type
         self.unit = sensor_unit
 
-
     def manifest(self) -> dict[str, str]:
         return {"id": self.id, "type": self.type, "unit": self.unit}
 
@@ -37,7 +36,6 @@ def _bounded_variation(value: float, minimum: float, maximum: float, step: float
         return maximum
 
     return next_value
-
 
 
 class TemperatureSensor(Sensor):
@@ -116,7 +114,6 @@ class LeakDetector(Sensor):
 
     def read_value(self) -> bool:
         return random.random() < 0.01
-
 
 
 def create_sensor(sensor_type: str, sensor_id: str) -> Sensor:

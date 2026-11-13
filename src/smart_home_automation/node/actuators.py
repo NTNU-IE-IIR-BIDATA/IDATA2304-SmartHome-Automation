@@ -11,23 +11,28 @@ class Actuator:
     type: str
     state: ActuatorState
 
+    def __init__(self, actuator_id: str, actuator_type: str, actuator_state: ActuatorState):
+        self.id = actuator_id
+        self.type = actuator_type
+        self.state = actuator_state
+
     def manifest(self) -> dict[str, str]:
         return {"id": self.id, "type": self.type, "state": self.state.value}
 
 
 class FanActuator(Actuator):
     def __init__(self, actuator_id: str) -> None:
-        Actuator.__init__(self, actuator_id, "fan", ActuatorState.OFF)
+        super().__init__(actuator_id, "fan", ActuatorState.OFF)
 
 
 class HeaterActuator(Actuator):
     def __init__(self, actuator_id: str) -> None:
-        Actuator.__init__(self, actuator_id, "heater", ActuatorState.OFF)
+        super().__init__(actuator_id, "heater", ActuatorState.OFF)
 
 
 class LockActuator(Actuator):
     def __init__(self, actuator_id: str) -> None:
-        Actuator.__init__(self, actuator_id, "lock", ActuatorState.CLOSED)
+        super().__init__(actuator_id, "lock", ActuatorState.CLOSED)
 
 
 def create_actuator(actuator_type: str, actuator_id: str) -> Actuator:

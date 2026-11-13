@@ -1,10 +1,11 @@
 from enum import StrEnum
 
-DEFAULT_PORT = 5555 # Default port for the smart home automation system
-WILDCARD = "ALL" # Used to indicate all nodes or panels
-MAX_MESSAGE_SIZE = 64 * 1024 # 64 KiB
+DEFAULT_PORT = 5555  # Default port for the smart home automation system
+WILDCARD = "ALL"  # Used to indicate all nodes or panels
+MAX_MESSAGE_SIZE = 64 * 1024  # 64 KiB
 
-class ErrorCode(StrEnum): #
+
+class ErrorCode(StrEnum):  #
     AUTH_FAILED = "ERR_AUTH_FAILED"
     MALFORMED_JSON = "ERR_MALFORMED_JSON"
     INVALID_SCHEMA = "ERR_INVALID_SCHEMA"
@@ -12,11 +13,13 @@ class ErrorCode(StrEnum): #
     ACTUATOR_NOT_FOUND = "ERR_ACTUATOR_NOT_FOUND"
     EXECUTION_FAILED = "ERR_EXECUTION_FAILED"
 
+
 class Role(StrEnum):
     ADMIN = "SHA_ADMIN"
     OWNER = "OWNER"
     GUEST = "GUEST"
     TECHNICIAN = "TECHNICIAN"
+
 
 class MessageType(StrEnum):
     REGISTER_NODE = "REGISTER_NODE"
@@ -27,11 +30,13 @@ class MessageType(StrEnum):
     ACTUATOR_STATE = "ACTUATOR_STATE"
     ERROR = "ERROR"
 
+
 class ActuatorState(StrEnum):
     ON = "ON"
     OFF = "OFF"
     OPEN = "OPEN"
     CLOSED = "CLOSED"
+
 
 class SensorType(StrEnum):
     TEMPERATURE = "temperature"
@@ -41,3 +46,15 @@ class SensorType(StrEnum):
     POWER = "power"
     MOTION = "motion"
     LEAK = "leak"
+
+
+class AnomalySeverity(StrEnum):
+    WARNING = "WARNING"
+    CRITICAL = "CRITICAL"
+
+
+class AnomalyThresholdLabels(StrEnum):
+    WARNING_MIN = "WARNING_MIN"
+    WARNING_MAX = "WARNING_MAX"
+    CRITICAL_MIN = "CRITICAL_MIN"
+    CRITICAL_MAX = "CRITICAL_MAX"

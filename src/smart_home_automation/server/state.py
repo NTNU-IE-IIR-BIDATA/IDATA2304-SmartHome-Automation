@@ -5,7 +5,6 @@ from ..common.messages import ProtocolError
 
 
 class ServerState:
-
     def __init__(self):
         self._nodes = {}
         self._connections = {}
@@ -80,13 +79,7 @@ class ServerState:
         return {"type": MessageType.SYSTEM_STATE, "nodes": deepcopy(list(self._nodes.values()))}
 
     def update_sensor_data(
-            self,
-            node_id,
-            sensor_id,
-            value,
-            unit=None,
-            timestamp=None,
-            connection=None
+        self, node_id, sensor_id, value, unit=None, timestamp=None, connection=None
     ):
         if node_id not in self._nodes:
             raise ProtocolError(ErrorCode.NODE_NOT_FOUND, f"Node {node_id} not found")
@@ -98,8 +91,7 @@ class ServerState:
 
         if target_sensor is None:
             raise ProtocolError(
-                ErrorCode.INVALID_SCHEMA,
-                f"Sensor {sensor_id} not found on node {node_id}"
+                ErrorCode.INVALID_SCHEMA, f"Sensor {sensor_id} not found on node {node_id}"
             )
 
         target_sensor["value"] = value

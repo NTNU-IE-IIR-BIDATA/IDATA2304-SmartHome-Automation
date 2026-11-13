@@ -6,16 +6,13 @@ MESSAGE_SCHEMAS = {
         "sensors": list,
         "actuators": list,
     },
-
     MessageType.REGISTER_PANEL: {
         "client_id": str,
         "role": str,
     },
-
     MessageType.SYSTEM_STATE: {
         "nodes": list,
     },
-
     MessageType.SENSOR_DATA: {
         "node_id": str,
         "sensor_id": str,
@@ -23,21 +20,18 @@ MESSAGE_SCHEMAS = {
         "unit": str,
         "timestamp": (int, float),
     },
-
     MessageType.ACTUATOR_CMD: {
         "target_node_id": str,
         "actuator_id": str,
         "command": str,
         "value": (int, float, type(None)),
     },
-
     MessageType.ACTUATOR_STATE: {
         "node_id": str,
         "actuator_id": str,
         "state": str,
         "success": bool,
     },
-
     MessageType.ERROR: {
         "code": str,
         "message": str,

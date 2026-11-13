@@ -12,6 +12,7 @@ def async_test(func):
 
     This avoids needing any external pytest plugins (like pytest-asyncio or anyio).
     """
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         return asyncio.run(func(*args, **kwargs))
@@ -109,7 +110,7 @@ class TestServerUnit:
             "type": MessageType.SENSOR_DATA,
             "node_id": "test_node_1",
             "sensor_id": "temp_1",
-            "value": 22
+            "value": 22,
         }
 
         with patch.object(server, "_handle_sensor_data", new_callable=AsyncMock) as mock_handler:
@@ -130,17 +131,17 @@ class TestServerUnit:
             "sensor_id": "temp_1",
             "value": 25.9,
             "unit": "celsius",
-            "timestamp": 12343212
+            "timestamp": 12343212,
         }
 
         await server._handle_sensor_data(sensor_msg, mock_writer, ("127.0.0.1", 12345))
         server.state.update_sensor_data.assert_called_once_with(
-            node_id = "test_node_1",
-            sensor_id = "temp_1",
-            value = 25.9,
-            unit = "celsius",
-            timestamp = 12343212,
-            connection = mock_writer
+            node_id="test_node_1",
+            sensor_id="temp_1",
+            value=25.9,
+            unit="celsius",
+            timestamp=12343212,
+            connection=mock_writer,
         )
 
 
@@ -199,11 +200,13 @@ class TestServerIntegration:
             reg_msg = {
                 "type": MessageType.REGISTER_NODE,
                 "node_id": "living_room_01",
-                "sensors": [{
-                    "id": "temp_1",
-                    "type": SensorType.TEMPERATURE.value,
-                    "unit": "celsius",
-                }],
+                "sensors": [
+                    {
+                        "id": "temp_1",
+                        "type": SensorType.TEMPERATURE.value,
+                        "unit": "celsius",
+                    }
+                ],
                 "actuators": [{"id": "fan_1", "type": "fan", "state": "OFF"}],
             }
             writer.write(encode_message(reg_msg))
