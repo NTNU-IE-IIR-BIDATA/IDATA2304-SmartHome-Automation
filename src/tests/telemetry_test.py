@@ -14,19 +14,19 @@ class FakeSensor:
         return False
 
 
-
 def test_sensor_data_message():
     node = SensorActuatorNode(node_id="room")
     sensor = FakeSensor()
 
     message = node.sensor_data_message(sensor)
 
-    assert message ["type"] == MessageType.SENSOR_DATA
-    assert message ["node_id"] == "room"
-    assert message ["sensor_id"] == "door_1"
-    assert message ["value"] is False
+    assert message["type"] == MessageType.SENSOR_DATA
+    assert message["node_id"] == "room"
+    assert message["sensor_id"] == "door_1"
+    assert message["value"] is False
     assert message["unit"] == "state"
     assert isinstance(message["timestamp"], float)
+
 
 def test_send_sensor_data():
     node = SensorActuatorNode(
@@ -52,6 +52,7 @@ def test_send_sensor_data():
     assert message["sensor_id"] == "door_1"
     assert message["value"] is False
 
+
 def test_telemetry_loop_repeats_and_stops(monkeypatch):
     node = SensorActuatorNode(node_id="room")
     node.writer = Mock()
@@ -72,6 +73,7 @@ def test_telemetry_loop_repeats_and_stops(monkeypatch):
 
     assert node.send_sensor_data.await_count == 2
     assert pauses == [5, 5]
+
 
 def test_run_stops_telemetry_on_disconnect():
     async def scenario():

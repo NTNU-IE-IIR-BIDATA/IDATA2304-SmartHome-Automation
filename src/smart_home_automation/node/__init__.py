@@ -39,7 +39,7 @@ async def start_node(node: SensorActuatorNode | None = None) -> None:
 
 
 def main() -> None:
-    """Entry point for 'uv run sensor'."""
+    """Entry point for 'uv run node'."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",

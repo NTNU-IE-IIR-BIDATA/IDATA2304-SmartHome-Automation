@@ -1,0 +1,104 @@
+import unittest
+from datetime import datetime
+
+from smart_home_automation.common.constants import AnomalySeverity, SensorType
+from smart_home_automation.control_panel.anomaly import Anomaly, AnomalyDetector
+
+
+class TestAnomalyDetector(unittest.TestCase):
+    def setUp(self):
+        self.detector = AnomalyDetector()
+
+    def test_numerical_normal_values_return_none(self):
+        # Temperature within [10, 35]
+        self.assertIsNone(
+            self.detector.evaluate("node_1", "temp_1", SensorType.TEMPERATURE, 21.5, "°C")
+        )
+        # Humidity within [20, 75]
+        self.assertIsNone(self.detector.evaluate("node_1", "hum_1", SensorType.HUMIDITY, 45.0, "%"))
+        # Power under 4000.0
+        self.assertIsNone(
+            self.detector.evaluate("node_1", "power_1", SensorType.POWER, 1500.0, "W")
+        )
+        # Air quality under 150
+        self.assertIsNone(
+            self.detector.evaluate("node_1", "air_1", SensorType.AIR_QUALITY, 50, "AQI")
+        )
+
+    def test_numerical_warning_thresholds(self):
+        # Temp slightly above WARNING_MAX (35)
+        anomaly_high = self.detector.evaluate(
+            "node_1", "temp_1", SensorType.TEMPERATURE, 36.0, "°C"
+        )
+        self.assertIsNotNone(anomaly_high)
+        self.assertEqual(anomaly_high.severity, AnomalySeverity.WARNING)
+        self.assertIn("is over threshold", anomaly_high.message)
+
+        # Temp slightly below WARNING_MIN (10)
+        anomaly_low = self.detector.evaluate("node_1", "temp_1", SensorType.TEMPERATURE, 8.0, "°C")
+        self.assertIsNotNone(anomaly_low)
+        self.assertEqual(anomaly_low.severity, AnomalySeverity.WARNING)
+        self.assertIn("is under threshold", anomaly_low.message)
+
+    def test_numerical_critical_thresholds_priority(self):
+        # Temp above CRITICAL_MAX (50) should be CRITICAL, not WARNING
+        anomaly_crit_high = self.detector.evaluate(
+            "node_1", "temp_1", SensorType.TEMPERATURE, 55.0, "°C"
+        )
+        self.assertIsNotNone(anomaly_crit_high)
+        self.assertEqual(anomaly_crit_high.severity, AnomalySeverity.CRITICAL)
+
+        # Temp below CRITICAL_MIN (5) should be CRITICAL, not WARNING
+        anomaly_crit_low = self.detector.evaluate(
+            "node_1", "temp_1", SensorType.TEMPERATURE, 2.0, "°C"
+        )
+        self.assertIsNotNone(anomaly_crit_low)
+        self.assertEqual(anomaly_crit_low.severity, AnomalySeverity.CRITICAL)
+
+    def test_numerical_sensors_with_none_thresholds(self):
+        # Power sensor has no minimum thresholds
+        self.assertIsNone(self.detector.evaluate("node_1", "power_1", SensorType.POWER, 0.0, "W"))
+        # Power above CRITICAL_MAX (10000.0)
+        power_crit = self.detector.evaluate("node_1", "power_1", SensorType.POWER, 12000.0, "W")
+        self.assertIsNotNone(power_crit)
+        self.assertEqual(power_crit.severity, AnomalySeverity.CRITICAL)
+
+    def test_boolean_sensor_detection(self):
+        # Smoke normal
+        self.assertIsNone(self.detector.evaluate("node_1", "smoke_1", SensorType.SMOKE, False, ""))
+        # Smoke triggered
+        smoke_anomaly = self.detector.evaluate("node_1", "smoke_1", SensorType.SMOKE, True, "")
+        self.assertIsNotNone(smoke_anomaly)
+        self.assertEqual(smoke_anomaly.severity, AnomalySeverity.CRITICAL)
+
+        # Leak normal
+        self.assertIsNone(self.detector.evaluate("node_1", "leak_1", SensorType.LEAK, False, ""))
+        # Leak triggered
+        leak_anomaly = self.detector.evaluate("node_1", "leak_1", SensorType.LEAK, True, "")
+        self.assertIsNotNone(leak_anomaly)
+        self.assertEqual(leak_anomaly.severity, AnomalySeverity.CRITICAL)
+
+    def test_anomaly_attributes(self):
+        anomaly = self.detector.evaluate(
+            node_id="kitchen_node",
+            sensor_id="temp_main",
+            sensor_type=SensorType.TEMPERATURE,
+            value=60.0,
+            unit="°C",
+        )
+        self.assertIsInstance(anomaly, Anomaly)
+        self.assertEqual(anomaly.node_id, "kitchen_node")
+        self.assertEqual(anomaly.sensor_id, "temp_main")
+        self.assertEqual(anomaly.value, 60.0)
+        self.assertEqual(anomaly.unit, "°C")
+        self.assertEqual(anomaly.severity, AnomalySeverity.CRITICAL)
+        self.assertIsInstance(anomaly.timestamp, datetime)
+
+    def test_sensor_without_thresholds_returns_none(self):
+        # Motion sensor has no configured thresholds
+        result = self.detector.evaluate("node_1", "motion_1", SensorType.MOTION, True, "")
+        self.assertIsNone(result)
+
+
+if __name__ == "__main__":
+    unittest.main()

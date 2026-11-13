@@ -68,10 +68,9 @@ class SensorActuatorNode:
             await self.writer.drain()
 
     async def telemetry_loop(self) -> None:
-        while self ._running and self .is_connected:
+        while self._running and self.is_connected:
             await self.send_sensor_data()
             await asyncio.sleep(5)
-
 
     async def connect(self) -> None:
         """Establish TCP connection to the server if not already connected."""
@@ -115,15 +114,9 @@ class SensorActuatorNode:
             await self.register()
 
             async with asyncio.TaskGroup() as tasks:
-                telemetry_task = tasks.create_task(
-                    self.telemetry_loop()
-                )
+                telemetry_task = tasks.create_task(self.telemetry_loop())
 
-                while (
-                    self._running
-                    and self.is_connected
-                    and self.reader is not None
-                ):
+                while self._running and self.is_connected and self.reader is not None:
                     line = await self.reader.readline()
 
                     if not line:
@@ -135,7 +128,6 @@ class SensorActuatorNode:
         finally:
             self._running = False
             await self.disconnect()
-
 
     def stop(self) -> None:
         """Signal SAN loop to stop."""

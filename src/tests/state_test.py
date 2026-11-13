@@ -9,7 +9,6 @@ from smart_home_automation.server.state import ServerState
 
 
 class TestServerState(unittest.TestCase):
-
     def setUp(self):
         self.state = ServerState()
         self.connection = object()
@@ -18,7 +17,9 @@ class TestServerState(unittest.TestCase):
 
     def register(self, node_id="room", connection=None):
         self.state.register_node(
-            node_id, self.sensors, self.actuators,
+            node_id,
+            self.sensors,
+            self.actuators,
             self.connection if connection is None else connection,
         )
 
@@ -36,7 +37,6 @@ class TestServerState(unittest.TestCase):
         # node not found
         self.assertIsNone(self.state.get_sensor("bedroom", "temp_1"))
 
-
     def test_update_sensor_data_success(self):
         self.register()
 
@@ -46,7 +46,7 @@ class TestServerState(unittest.TestCase):
             value=23,
             unit="celsius",
             timestamp=1234567543,
-            connection=self.connection
+            connection=self.connection,
         )
         sensor = self.state.get_sensor("room", "temp_1")
 
@@ -57,10 +57,7 @@ class TestServerState(unittest.TestCase):
     def test_update_sensor_data_node_not_found(self):
         with self.assertRaises(ProtocolError) as ctx:
             self.state.update_sensor_data(
-                node_id="no_room",
-                sensor_id="temp_1",
-                value=20.1,
-                connection=self.connection
+                node_id="no_room", sensor_id="temp_1", value=20.1, connection=self.connection
             )
         self.assertEqual(ctx.exception.code, ErrorCode.NODE_NOT_FOUND)
 
@@ -71,20 +68,14 @@ class TestServerState(unittest.TestCase):
         # wrong connection
         with self.assertRaises(ProtocolError) as ctx:
             self.state.update_sensor_data(
-                node_id="room",
-                sensor_id="temp_1",
-                value=20.1,
-                connection=wrong_conn
+                node_id="room", sensor_id="temp_1", value=20.1, connection=wrong_conn
             )
         self.assertEqual(ctx.exception.code, ErrorCode.AUTH_FAILED)
 
         # missing connection
         with self.assertRaises(ProtocolError) as ctx:
             self.state.update_sensor_data(
-                node_id="room",
-                sensor_id="temp_1",
-                value=20.1,
-                connection=None
+                node_id="room", sensor_id="temp_1", value=20.1, connection=None
             )
         self.assertEqual(ctx.exception.code, ErrorCode.AUTH_FAILED)
 
@@ -93,10 +84,7 @@ class TestServerState(unittest.TestCase):
 
         with self.assertRaises(ProtocolError) as ctx:
             self.state.update_sensor_data(
-                node_id="room",
-                sensor_id="no_sensor",
-                value=20.1,
-                connection=self.connection
+                node_id="room", sensor_id="no_sensor", value=20.1, connection=self.connection
             )
 
         self.assertEqual(ctx.exception.code, ErrorCode.INVALID_SCHEMA)
@@ -208,6 +196,7 @@ class TestServerState(unittest.TestCase):
 
 class TestStateTCP(unittest.IsolatedAsyncioTestCase):
 
+class TestStateTCP(unittest.IsolatedAsyncioTestCase):
     async def test_registration_duplicate_and_disconnect(self):
         server = Server()
         listener = await asyncio.start_server(server.handle_client, "127.0.0.1", 0)
@@ -224,13 +213,22 @@ class TestStateTCP(unittest.IsolatedAsyncioTestCase):
         try:
             _, first = await asyncio.open_connection("127.0.0.1", port)
             writers.append(first)
-            registration = json.dumps({
-                "type": "REGISTER_NODE", "node_id": "room",
-                "sensors": [{
-                    "id": "temp_1",
-                    "type": SensorType.TEMPERATURE.value,
-                }], "actuators": [],
-            }).encode() + b"\n"
+            registration = (
+                json.dumps(
+                    {
+                        "type": "REGISTER_NODE",
+                        "node_id": "room",
+                        "sensors": [
+                            {
+                                "id": "temp_1",
+                                "type": SensorType.TEMPERATURE.value,
+                            }
+                        ],
+                        "actuators": [],
+                    }
+                ).encode()
+                + b"\n"
+            )
             first.write(registration)
             await first.drain()
             await wait_for(lambda: server.state.get_connection("room") is not None)
@@ -252,6 +250,7 @@ class TestStateTCP(unittest.IsolatedAsyncioTestCase):
                 await writer.wait_closed()
             listener.close()
             await listener.wait_closed()
+
 
 if __name__ == "__main__":
     unittest.main()
