@@ -131,6 +131,7 @@ class Server:
             timestamp=timestamp,
             connection=writer,
         )
+        await self._broadcast_sensor_data(message)
         logging.info(f"Sensor data from {node_id}.{sensor_id}: {value} {unit or ''}".strip())
 
     async def _handle_register_node(self, message: dict, writer: asyncio.StreamWriter, peer):
@@ -164,7 +165,31 @@ class Server:
 
         client_id = message["client_id"]
         role = message["role"]
-        logging.info(f"Control panel {client_id} registered from {peer} with role {role}")
+
+        self.state.register_panel(client_id, role, writer)
+
+        snapshot = self.state.system_state()
+        writer.write(encode_message(snapshot))
+        await writer.drain()
+
+        logging.info(
+            f"Control panel {client_id} registered from {peer} "
+            f"with role {role}"
+        )
+
+    async def _broadcast_sensor_data(self, message):
+        payload = encode_message(message)
+
+        for panel_writer in self.state.get_panel_connections():
+            try:
+                panel_writer.write(payload)
+                await panel_writer.drain()
+            except (ConnectionError, OSError):
+                self.state.disconnect(panel_writer)
+                panel_writer.close()
+                logging.warning(
+                    "removed deisconnected control panel"
+                )
 
     async def _send_error(self, writer: asyncio.StreamWriter, code: ErrorCode, message: str):
         """
