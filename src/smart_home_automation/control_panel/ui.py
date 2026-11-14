@@ -68,14 +68,13 @@ class ControlPanelApp(App):
             return
 
         log = self.query_one("#alert_log", RichLog)
-        log.write("Kobler til serveren ...")
 
         try:
             await self.client.run()
         except OSError as error:
-            log.write(f"Tilkoblingsfeil: {error}")
+            log.write(f"Connection error: {error}")
         else:
-            log.write("Forbindelsen til serveren er avsluttet.")
+            log.write("Connection to server closed")
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         command = event.value.strip().lower()
