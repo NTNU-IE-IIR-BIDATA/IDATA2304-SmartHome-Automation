@@ -10,7 +10,6 @@ from ..control_panel.anomaly import AnomalyDetector
 from .client import ControlPanelClient
 
 
-
 class ControlPanelApp(App):
     CSS = """
     Screen {
@@ -32,9 +31,9 @@ class ControlPanelApp(App):
     BINDINGS = [Binding("q", "quit", "Quit"), Binding("c", "clear_alerts", "Clear Alerts")]
 
     def __init__(
-            self,
-            client: ControlPanelClient | None = None,
-            **kwargs,
+        self,
+        client: ControlPanelClient | None = None,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.client = client
@@ -87,16 +86,13 @@ class ControlPanelApp(App):
     def action_clear_alerts(self) -> None:
         self.query_one("#alert_log", RichLog).clear()
 
-
     def handle_server_update(self, message: dict) -> None:
         if message["type"] == MessageType.SYSTEM_STATE:
             self.load_system_state(message)
             return
 
         if message["type"] == MessageType.ERROR:
-            self.query_one("#alert_log", RichLog).write(
-                f"Server error: {message['message']}"
-            )
+            self.query_one("#alert_log", RichLog).write(f"Server error: {message['message']}")
             return
 
         if message["type"] != MessageType.SENSOR_DATA:
@@ -121,7 +117,6 @@ class ControlPanelApp(App):
                     message["unit"],
                 )
                 return
-
 
     def load_system_state(self, state: dict) -> None:
         table = self.query_one("#sensor_table", DataTable)
@@ -151,11 +146,10 @@ class ControlPanelApp(App):
                         sensor_type.value,
                         "—",
                         unit,
-                        "Venter på data",
+                        "Waiting for data",
                         "—",
                     )
                     self._sensor_rows[(node_id, sensor_id)] = row_key
-
 
     def update_sensor(
         self,

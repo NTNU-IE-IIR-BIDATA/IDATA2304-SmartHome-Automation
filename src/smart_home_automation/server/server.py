@@ -172,10 +172,7 @@ class Server:
         writer.write(encode_message(snapshot))
         await writer.drain()
 
-        logging.info(
-            f"Control panel {client_id} registered from {peer} "
-            f"with role {role}"
-        )
+        logging.info(f"Control panel {client_id} registered from {peer} with role {role}")
 
     async def _broadcast_sensor_data(self, message):
         payload = encode_message(message)
@@ -187,9 +184,7 @@ class Server:
             except (ConnectionError, OSError):
                 self.state.disconnect(panel_writer)
                 panel_writer.close()
-                logging.warning(
-                    "removed deisconnected control panel"
-                )
+                logging.warning("removed deisconnected control panel")
 
     async def _send_error(self, writer: asyncio.StreamWriter, code: ErrorCode, message: str):
         """

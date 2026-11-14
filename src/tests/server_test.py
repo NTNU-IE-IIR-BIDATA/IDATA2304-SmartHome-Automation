@@ -153,21 +153,15 @@ class TestServerUnit:
             "room",
             [{"id": "temp_1", "type": "temperature", "unit": "celsius"}],
             [],
-            node_connection
+            node_connection,
         )
 
         writer = MagicMock()
         writer.drain = AsyncMock()
 
-        message = {
-            "type": MessageType.REGISTER_PANEL,
-            "client_id": "panel_01",
-            "role": "OWNER"
-        }
+        message = {"type": MessageType.REGISTER_PANEL, "client_id": "panel_01", "role": "OWNER"}
 
-        await server._handle_register_panel(
-            message, writer, ("127.0.0.1", 12345)
-        )
+        await server._handle_register_panel(message, writer, ("127.0.0.1", 12345))
 
         writer.write.assert_called_once()
         sent = decode_message(writer.write.call_args.args[0])
@@ -205,9 +199,7 @@ class TestServerUnit:
             "timestamp": 123.0,
         }
 
-        await server._handle_sensor_data(
-            message, node_connection, ("127.0.0.1", 12345)
-        )
+        await server._handle_sensor_data(message, node_connection, ("127.0.0.1", 12345))
 
         sensor = server.state.get_sensor("room", "temp_1")
         assert sensor["value"] == 22.5
@@ -249,6 +241,7 @@ class TestServerUnit:
         sent = decode_message(healthy.write.call_args.args[0])
         assert sent == message
         healthy.drain.assert_awaited_once()
+
 
 class TestServerIntegration:
     """Integration tests: spin up server on port 0 and connect real TCP clients."""

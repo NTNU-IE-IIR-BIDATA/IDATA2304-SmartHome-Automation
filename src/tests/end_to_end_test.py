@@ -30,9 +30,7 @@ class TestEndToEnd(unittest.IsolatedAsyncioTestCase):
             finally:
                 handlers.discard(task)
 
-        listener = await asyncio.start_server(
-            handle_connection, "127.0.0.1", 0
-        )
+        listener = await asyncio.start_server(handle_connection, "127.0.0.1", 0)
         port = listener.sockets[0].getsockname()[1]
 
         sensor = TemperatureSensor("temp_1")
@@ -57,10 +55,7 @@ class TestEndToEnd(unittest.IsolatedAsyncioTestCase):
 
             def initial_measurement_received():
                 nodes = server.state.system_state()["nodes"]
-                return (
-                        len(nodes) == 1
-                        and nodes[0]["sensors"][0].get("value") == 21.0
-                )
+                return len(nodes) == 1 and nodes[0]["sensors"][0].get("value") == 21.0
 
             await wait_until(initial_measurement_received)
 
@@ -79,9 +74,7 @@ class TestEndToEnd(unittest.IsolatedAsyncioTestCase):
                     with patch.object(sensor, "read_value", return_value=value):
                         await node.send_sensor_data()
 
-                    await wait_until(
-                        lambda: table.get_row_at(0)[3] == str(value)
-                    )
+                    await wait_until(lambda: table.get_row_at(0)[3] == str(value))
                     self.assertEqual(table.row_count, 1)
                     self.assertEqual(
                         client.state["nodes"][0]["sensors"][0]["value"],

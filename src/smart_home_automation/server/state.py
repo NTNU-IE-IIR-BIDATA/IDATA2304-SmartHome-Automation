@@ -12,39 +12,19 @@ class ServerState:
 
     def register_panel(self, client_id, role, connection):
         if not isinstance(client_id, str) or not client_id.strip():
-            raise ProtocolError(
-                ErrorCode.INVALID_SCHEMA,
-                "Invalid client_id"
-            )
+            raise ProtocolError(ErrorCode.INVALID_SCHEMA, "Invalid client_id")
 
         if client_id in self._panels:
-            raise ProtocolError(
-                ErrorCode.INVALID_SCHEMA,
-                "Panel is already registered"
-            )
+            raise ProtocolError(ErrorCode.INVALID_SCHEMA, "Panel is already registered")
 
-        if any(
-            panel["connection"] is connection
-            for panel in self._panels.values()
-        ) or any (
-            current is connection
-            for current in self._connections.values()
+        if any(panel["connection"] is connection for panel in self._panels.values()) or any(
+            current is connection for current in self._connections.values()
         ):
-            raise ProtocolError(
-                ErrorCode.INVALID_SCHEMA,
-                "Connection is already registered"
-            )
-        self._panels[client_id] = {
-            "role": role,
-            "connection": connection
-        }
+            raise ProtocolError(ErrorCode.INVALID_SCHEMA, "Connection is already registered")
+        self._panels[client_id] = {"role": role, "connection": connection}
 
     def get_panel_connections(self):
-        return [
-            panel["connection"]
-            for panel in self._panels.values()
-        ]
-
+        return [panel["connection"] for panel in self._panels.values()]
 
     def register_node(self, node_id, sensors, actuators, connection):
         if not isinstance(node_id, str) or not node_id.strip() or node_id == "ALL":

@@ -194,6 +194,7 @@ class TestServerState(unittest.TestCase):
             [first],
         )
 
+
 class TestStateTCP(unittest.IsolatedAsyncioTestCase):
     async def test_registration_duplicate_and_disconnect(self):
         server = Server()
