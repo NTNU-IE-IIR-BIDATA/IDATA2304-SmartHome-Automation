@@ -5,8 +5,10 @@ from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widgets import DataTable, Footer, Header, Input, RichLog, Static
 
-from ..common.constants import AnomalySeverity, SensorType
+from ..common.constants import AnomalySeverity, MessageType, SensorType
 from ..control_panel.anomaly import AnomalyDetector
+from .client import ControlPanelClient
+
 
 
 class ControlPanelApp(App):
@@ -29,10 +31,14 @@ class ControlPanelApp(App):
 
     BINDINGS = [Binding("q", "quit", "Quit"), Binding("c", "clear_alerts", "Clear Alerts")]
 
-    def __init__(self, **kwargs):
+    def __init__(
+            self,
+            client: ControlPanelClient | None = None,
+            **kwargs,
+    ):
         super().__init__(**kwargs)
+        self.client = client
         self.detector = AnomalyDetector()
-
         self._sensor_rows = {}
 
     def compose(self) -> ComposeResult:
@@ -53,6 +59,24 @@ class ControlPanelApp(App):
         table.cursor_type = "row"
         table.add_columns("Node", "Sensor", "Type", "Value", "Unit", "Status", "Updated")
 
+        if self.client is not None:
+            self.client.on_update = self.handle_server_update
+            self.run_worker(self._run_client(), name="panel-client")
+
+    async def _run_client(self) -> None:
+        if self.client is None:
+            return
+
+        log = self.query_one("#alert_log", RichLog)
+        log.write("Kobler til serveren ...")
+
+        try:
+            await self.client.run()
+        except OSError as error:
+            log.write(f"Tilkoblingsfeil: {error}")
+        else:
+            log.write("Forbindelsen til serveren er avsluttet.")
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         command = event.value.strip().lower()
 
@@ -63,6 +87,76 @@ class ControlPanelApp(App):
 
     def action_clear_alerts(self) -> None:
         self.query_one("#alert_log", RichLog).clear()
+
+
+    def handle_server_update(self, message: dict) -> None:
+        if message["type"] == MessageType.SYSTEM_STATE:
+            self.load_system_state(message)
+            return
+
+        if message["type"] == MessageType.ERROR:
+            self.query_one("#alert_log", RichLog).write(
+                f"Server error: {message['message']}"
+            )
+            return
+
+        if message["type"] != MessageType.SENSOR_DATA:
+            return
+
+        if self.client is None:
+            return
+
+        for node in self.client.state["nodes"]:
+            if node["node_id"] != message["node_id"]:
+                continue
+
+            for sensor in node.get("sensors", []):
+                if sensor["id"] != message["sensor_id"]:
+                    continue
+
+                self.update_sensor(
+                    node["node_id"],
+                    sensor["id"],
+                    SensorType(sensor["type"]),
+                    message["value"],
+                    message["unit"],
+                )
+                return
+
+
+    def load_system_state(self, state: dict) -> None:
+        table = self.query_one("#sensor_table", DataTable)
+        table.clear()
+        self._sensor_rows.clear()
+
+        for node in state.get("nodes", []):
+            node_id = node["node_id"]
+
+            for sensor in node.get("sensors", []):
+                sensor_id = sensor["id"]
+                sensor_type = SensorType(sensor["type"])
+                unit = sensor.get("unit", "")
+
+                if sensor.get("value") is not None:
+                    self.update_sensor(
+                        node_id,
+                        sensor_id,
+                        sensor_type,
+                        sensor["value"],
+                        unit,
+                    )
+                else:
+                    row_key = table.add_row(
+                        node_id,
+                        sensor_id,
+                        sensor_type.value,
+                        "—",
+                        unit,
+                        "Venter på data",
+                        "—",
+                    )
+                    self._sensor_rows[(node_id, sensor_id)] = row_key
+
 
     def update_sensor(
         self,

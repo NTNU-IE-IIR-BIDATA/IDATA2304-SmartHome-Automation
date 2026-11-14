@@ -2,6 +2,7 @@ import asyncio
 import logging
 from copy import deepcopy
 from typing import Self
+from collections.abc import Callable
 
 from ..common.constants import DEFAULT_PORT, MessageType
 from ..common.framing import decode_message, encode_message
@@ -12,12 +13,12 @@ class ControlPanelClient:
     """Async TCP client for monitoring the smart-home system."""
 
     def __init__(
-        self,
-        client_id: str,
-        role: str,
-        host: str = "127.0.0.1",
-        port: int = DEFAULT_PORT,
-    ) -> None:
+            self,
+            client_id: str,
+            role: str,
+            host: str = "127.0.0.1",
+            port: int = DEFAULT_PORT,
+            on_update: Callable[[dict], None] | None = None) -> None:
         if not client_id:
             raise ValueError("client_id must not be empty")
         if not role:
@@ -27,6 +28,7 @@ class ControlPanelClient:
         self.role = role
         self.host = host
         self.port = port
+        self.on_update = on_update
         self.reader: asyncio.StreamReader | None = None
         self.writer: asyncio.StreamWriter | None = None
         self.state_cache: dict = {"type": MessageType.SYSTEM_STATE, "nodes": []}
@@ -111,6 +113,10 @@ class ControlPanelClient:
             else:
                 self._update_state(message)
 
+            if self.on_update is not None:
+                self.on_update(deepcopy(message))
+
+
         self._running = False
 
     async def disconnect(self) -> None:
@@ -147,3 +153,4 @@ class ControlPanelClient:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.disconnect()
+

@@ -195,8 +195,6 @@ class TestServerState(unittest.TestCase):
         )
 
 class TestStateTCP(unittest.IsolatedAsyncioTestCase):
-
-class TestStateTCP(unittest.IsolatedAsyncioTestCase):
     async def test_registration_duplicate_and_disconnect(self):
         server = Server()
         listener = await asyncio.start_server(server.handle_client, "127.0.0.1", 0)

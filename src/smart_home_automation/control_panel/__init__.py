@@ -1,16 +1,13 @@
-import logging
+from .client import ControlPanelClient
+from .ui import ControlPanelApp
 
-
-def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
+def main() -> None:
+    client = ControlPanelClient(
+        client_id="panel_1",
+        role="OWNER",
     )
-    try:
-        print("Control panel connected")
-    except KeyboardInterrupt:
-        logging.info("Control panel shut down")
-
+    app = ControlPanelApp(client=client)
+    app.run()
 
 if __name__ == "__main__":
     main()
