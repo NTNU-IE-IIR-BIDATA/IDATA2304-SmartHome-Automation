@@ -4,8 +4,9 @@ import time
 from collections.abc import Sequence
 from typing import Self
 
-from smart_home_automation.common.constants import DEFAULT_PORT, MessageType
+from smart_home_automation.common.constants import DEFAULT_PORT, ErrorCode, MessageType
 from smart_home_automation.common.framing import decode_message, encode_message
+from smart_home_automation.common.messages import create_error_message
 
 from .actuators import Actuator
 from .sensors import Sensor
@@ -80,6 +81,15 @@ class SensorActuatorNode:
             None,
         )
         if actuator is None:
+            if self.writer is None:
+                raise RuntimeError(f"Node '{self.node_id}' is not connected")
+
+            error = create_error_message(
+                ErrorCode.ACTUATOR_NOT_FOUND,
+                f"Actuator {actuator_id} does not exist on node {self.node_id}.",
+            )
+            self.writer.write(encode_message(error))
+            await self.writer.drain()
             logging.warning("Actuator '%s' was not found on node '%s'", actuator_id, self.node_id)
             return
 

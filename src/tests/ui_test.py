@@ -53,7 +53,7 @@ class TestControlPanelUI(unittest.IsolatedAsyncioTestCase):
                     "humidity",
                     "—",
                     "percent",
-                    "Venter på data",
+                    "Waiting for data",
                 ],
             )
 
