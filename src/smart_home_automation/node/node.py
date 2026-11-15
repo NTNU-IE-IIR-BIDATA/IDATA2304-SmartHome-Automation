@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Self
 
 from smart_home_automation.common.constants import DEFAULT_PORT, MessageType
-from smart_home_automation.common.framing import encode_message
+from smart_home_automation.common.framing import decode_message, encode_message
 
 from .actuators import Actuator
 from .sensors import Sensor
@@ -72,6 +72,31 @@ class SensorActuatorNode:
             await self.send_sensor_data()
             await asyncio.sleep(5)
 
+    async def handle_command(self, message: dict) -> None:
+        """Execute an actuator command and send its state confirmation."""
+        actuator_id = message["actuator_id"]
+        actuator = next(
+            (candidate for candidate in self.actuators if candidate.id == actuator_id),
+            None,
+        )
+        if actuator is None:
+            logging.warning("Actuator '%s' was not found on node '%s'", actuator_id, self.node_id)
+            return
+
+        success = actuator.execute(message["command"], message["value"])
+        if self.writer is None:
+            raise RuntimeError(f"Node '{self.node_id}' is not connected")
+
+        response = {
+            "type": MessageType.ACTUATOR_STATE,
+            "node_id": self.node_id,
+            "actuator_id": actuator.id,
+            "state": actuator.state.value,
+            "success": success,
+        }
+        self.writer.write(encode_message(response))
+        await self.writer.drain()
+
     async def connect(self) -> None:
         """Establish TCP connection to the server if not already connected."""
         if self.is_connected:
@@ -122,6 +147,9 @@ class SensorActuatorNode:
                     if not line:
                         logging.info("Server closed the connection")
                         break
+                    message = decode_message(line)
+                    if message["type"] == MessageType.ACTUATOR_CMD:
+                        await self.handle_command(message)
 
                 telemetry_task.cancel()
 
