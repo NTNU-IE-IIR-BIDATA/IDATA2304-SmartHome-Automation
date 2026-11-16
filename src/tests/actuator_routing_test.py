@@ -1,0 +1,204 @@
+import asyncio
+import unittest
+from unittest.mock import AsyncMock, MagicMock
+
+from smart_home_automation.common.constants import ErrorCode, MessageType
+from smart_home_automation.common.framing import decode_message, encode_message
+from smart_home_automation.common.messages import ProtocolError
+from smart_home_automation.control_panel.client import ControlPanelClient
+from smart_home_automation.node.actuators import FanActuator
+from smart_home_automation.node.node import SensorActuatorNode
+from smart_home_automation.server.server import Server
+
+def writer_mock():
+    writer = MagicMock()
+    writer.drain = AsyncMock()
+    return writer
+
+def command(**changes):
+    message = dict(type=MessageType.ACTUATOR_CMD, target_node_id="room",
+                   actuator_id="fan_1", command="ON", value=None)
+    return message | changes
+
+def confirmation(**changes):
+    message = dict(type=MessageType.ACTUATOR_STATE, node_id="room",
+                   actuator_id="fan_1", state="ON", success=True)
+    return message | changes
+
+class TestActuatorRouting(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.server = Server()
+        self.node = writer_mock()
+        self.other_node = writer_mock()
+        manifest = [{"id": "fan_1", "type": "fan", "state": "OFF"}]
+        self.server.state.register_node("room", [], manifest, self.node)
+        self.server.state.register_node("other_room", [], manifest, self.other_node)
+        self.panels = [writer_mock(), writer_mock()]
+        for index, panel in enumerate(self.panels):
+            self.server.state.register_panel(f"panel_{index}", "OWNER", panel)
+
+    async def dispatch(self, message, writer):
+        await self.server._dispatch_message(message, writer, ("127.0.0.1", 12345))
+
+    async def test_command_only_reaches_target_without_changing_state(self):
+        message = command()
+        await self.dispatch(message, self.panels[0])
+        self.node.write.assert_called_once_with(encode_message(message))
+        self.node.drain.assert_awaited_once()
+        self.other_node.write.assert_not_called()
+        for panel in self.panels:
+            panel.write.assert_not_called()
+        self.assertEqual(self.server.state.get_actuator("room", "fan_1")["state"], "OFF")
+
+    async def test_invalid_targets_return_errors_to_panel(self):
+        for message, code in [
+            (command(target_node_id="missing"), ErrorCode.NODE_NOT_FOUND),
+            (command(actuator_id="missing"), ErrorCode.ACTUATOR_NOT_FOUND),
+        ]:
+            with self.subTest(code=code):
+                reader = MagicMock()
+                reader.readline = AsyncMock(side_effect=[encode_message(message), b""])
+                panel = self.panels[0]
+                panel.reset_mock()
+                await self.server._read_loop(reader, panel, None)
+                reply = decode_message(panel.write.call_args.args[0])
+                self.assertEqual(reply["type"], MessageType.ERROR)
+                self.assertEqual(reply["code"], code)
+        self.node.write.assert_not_called()
+        self.other_node.write.assert_not_called()
+
+    async def test_disconnected_target_is_rejected(self):
+        self.server.state.disconnect(self.node)
+        with self.assertRaises(ProtocolError) as error:
+            await self.dispatch(command(), self.panels[0])
+        self.assertEqual(error.exception.code, ErrorCode.NODE_NOT_FOUND)
+        self.node.write.assert_not_called()
+
+    async def test_unregistered_client_and_node_cannot_send_commands(self):
+        for sender in [writer_mock(), self.node]:
+            with self.subTest(sender=sender):
+                with self.assertRaises(ProtocolError) as error:
+                    await self.dispatch(command(), sender)
+                self.assertEqual(error.exception.code, ErrorCode.AUTH_FAILED)
+        self.node.write.assert_not_called()
+
+    async def test_confirmation_updates_cache_and_all_panels(self):
+        message = confirmation()
+        await self.dispatch(message, self.node)
+        self.assertEqual(self.server.state.get_actuator("room", "fan_1")["state"], "ON")
+        self.assertEqual(self.server.state.get_actuator("other_room", "fan_1")["state"], "OFF")
+        for panel in self.panels:
+            panel.write.assert_called_once_with(encode_message(message))
+            panel.drain.assert_awaited_once()
+        newcomer = writer_mock()
+        await self.dispatch(dict(type=MessageType.REGISTER_PANEL,
+                                 client_id="new_panel", role="OWNER"), newcomer)
+        snapshot = decode_message(newcomer.write.call_args.args[0])
+        room = next(node for node in snapshot["nodes"] if node["node_id"] == "room")
+        self.assertEqual(room["actuators"][0]["state"], "ON")
+
+    async def test_wrong_connection_cannot_change_state(self):
+        for sender in [self.other_node, self.panels[0], writer_mock()]:
+            with self.subTest(sender=sender):
+                with self.assertRaises(ProtocolError) as error:
+                    await self.dispatch(confirmation(), sender)
+                self.assertEqual(error.exception.code, ErrorCode.AUTH_FAILED)
+        self.assertEqual(self.server.state.get_actuator("room", "fan_1")["state"], "OFF")
+        for panel in self.panels:
+            panel.write.assert_not_called()
+
+    async def test_unknown_state_target_is_rejected(self):
+        for message, code in [
+            (confirmation(node_id="missing"), ErrorCode.NODE_NOT_FOUND),
+            (confirmation(actuator_id="missing"), ErrorCode.ACTUATOR_NOT_FOUND),
+        ]:
+            with self.subTest(code=code):
+                with self.assertRaises(ProtocolError) as error:
+                    await self.dispatch(message, self.node)
+                self.assertEqual(error.exception.code, code)
+        for panel in self.panels:
+            panel.write.assert_not_called()
+
+    async def test_failed_execution_preserves_reported_state_and_failure_flag(self):
+        message = confirmation(state="OFF", success=False)
+        await self.dispatch(message, self.node)
+        self.assertEqual(self.server.state.get_actuator("room", "fan_1")["state"], "OFF")
+        for panel in self.panels:
+            panel.write.assert_called_once_with(encode_message(message))
+
+    async def test_node_write_failure_disconnects_node(self):
+        self.node.drain.side_effect = ConnectionResetError()
+        with self.assertRaises(ProtocolError) as error:
+            await self.dispatch(command(), self.panels[0])
+        self.assertEqual(error.exception.code, ErrorCode.EXECUTION_FAILED)
+        self.assertIsNone(self.server.state.get_connection("room"))
+        self.assertFalse(self.server.state.get_node("room")["connected"])
+        self.node.close.assert_called_once()
+
+    async def test_broken_panel_does_not_block_other_panel(self):
+        self.panels[0].drain.side_effect = ConnectionResetError()
+        await self.dispatch(confirmation(), self.node)
+        self.panels[1].write.assert_called_once_with(encode_message(confirmation()))
+        self.assertEqual(self.server.state.get_panel_connections(), [self.panels[1]])
+
+    def test_get_actuator_returns_independent_copy(self):
+        actuator = self.server.state.get_actuator("room", "fan_1")
+        actuator["state"] = "ON"
+        self.assertEqual(self.server.state.get_actuator("room", "fan_1")["state"], "OFF")
+        self.assertIsNone(self.server.state.get_actuator("missing", "fan_1"))
+        self.assertIsNone(self.server.state.get_actuator("room", "missing"))
+
+class TestActuatorTCP(unittest.IsolatedAsyncioTestCase):
+    async def test_real_node_and_two_panels_on_off_and_invalid_command(self):
+        server = Server()
+        handlers = set()
+
+        async def handle(reader, writer):
+            task = asyncio.current_task()
+            handlers.add(task)
+            try:
+                await server.handle_client(reader, writer)
+            finally:
+                handlers.discard(task)
+
+        listener = await asyncio.start_server(handle, "127.0.0.1", 0)
+        port = listener.sockets[0].getsockname()[1]
+        fan = FanActuator("fan_1")
+        node = SensorActuatorNode("room", actuators=[fan], port=port)
+        queues = [asyncio.Queue(), asyncio.Queue()]
+        panels = [ControlPanelClient(f"panel_{i}", "OWNER", port=port,
+                                     on_update=queue.put_nowait)
+                  for i, queue in enumerate(queues)]
+        tasks = []
+        try:
+            async with asyncio.timeout(5):
+                tasks.append(asyncio.create_task(node.run()))
+                while server.state.get_connection("room") is None:
+                    if tasks[0].done():
+                        await tasks[0]
+                        self.fail("Node stopped before registering")
+                    await asyncio.sleep(0.01)
+                tasks.extend(asyncio.create_task(panel.run()) for panel in panels)
+                for queue in queues:
+                    self.assertEqual((await queue.get())["type"], MessageType.SYSTEM_STATE)
+                for requested, expected, success in [
+                    ("ON", "ON", True), ("OFF", "OFF", True), ("OPEN", "OFF", False)
+                ]:
+                    await panels[0].send_actuator_command("room", "fan_1", requested)
+                    for queue in queues:
+                        self.assertEqual(await queue.get(), confirmation(state=expected, success=success))
+                    self.assertEqual(fan.state.value, expected)
+                    self.assertEqual(server.state.get_actuator("room", "fan_1")["state"], expected)
+                    for panel in panels:
+                        self.assertEqual(panel.state["nodes"][0]["actuators"][0]["state"], expected)
+        finally:
+            node.stop()
+            for panel in panels:
+                panel.stop()
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            listener.close()
+            await listener.wait_closed()
+            if handlers:
+                await asyncio.wait_for(asyncio.gather(*list(handlers)), timeout=5)

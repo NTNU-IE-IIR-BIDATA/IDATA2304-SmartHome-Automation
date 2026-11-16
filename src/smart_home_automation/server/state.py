@@ -124,3 +124,39 @@ class ServerState:
             target_sensor["unit"] = unit
         if timestamp is not None:
             target_sensor["timestamp"] = timestamp
+
+    def get_actuator(self, node_id, actuator_id):
+        node = self._nodes.get(node_id)
+        if node is None:
+            return None
+
+        for actuator in node["actuators"]:
+            if actuator["id"] == actuator_id:
+                return deepcopy(actuator)
+
+        return None
+
+    def update_actuator_state(
+            self, node_id, actuator_id, state, connection=None
+    ):
+        if node_id not in self._nodes:
+            raise ProtocolError(
+                ErrorCode.NODE_NOT_FOUND,
+                f"Node {node_id} not found",
+            )
+
+        if connection is None or connection is not self.get_connection(node_id):
+            raise ProtocolError(
+                ErrorCode.AUTH_FAILED,
+                "Node id does not match connection",
+            )
+
+        for actuator in self._nodes[node_id]["actuators"]:
+            if actuator["id"] == actuator_id:
+                actuator["state"] = state
+                return
+
+        raise ProtocolError(
+            ErrorCode.ACTUATOR_NOT_FOUND,
+            f"Actuator {actuator_id} not found on node {node_id}",
+        )
