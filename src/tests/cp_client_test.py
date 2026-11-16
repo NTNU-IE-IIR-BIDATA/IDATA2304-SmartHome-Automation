@@ -1,4 +1,5 @@
 import asyncio
+
 import pytest
 
 from smart_home_automation.common.constants import MessageType
@@ -185,3 +186,54 @@ async def _test_send_actuator_command_requires_connection():
 
     with pytest.raises(RuntimeError, match="not connected"):
         await client.send_actuator_command("living_room_01", "fan_01", "ON")
+
+def test_control_panel_merges_actuator_state():
+    asyncio.run(_test_control_panel_merges_actuator_state())
+
+async def _test_control_panel_merges_actuator_state():
+
+    system_state = {
+        "type": MessageType.SYSTEM_STATE,
+        "nodes": [
+            {
+                "node_id": "living_room_01",
+                "connected": True,
+                "sensors": [],
+                "actuators": [
+                    {"id": "fan_1", "type": "fan", "state": "OFF"},
+                    {"id": "heater_1", "type": "heater", "state": "OFF"},
+                ],
+            }
+        ],
+    }
+    actuator_state = {
+        "type": MessageType.ACTUATOR_STATE,
+        "node_id": "living_room_01",
+        "actuator_id": "fan_1",
+        "state": "ON",
+        "success": True,
+    }
+
+    async def send_updates(reader, writer):
+        writer.write(encode_message(system_state))
+        writer.write(encode_message(actuator_state))
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(send_updates, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    updates = []
+    client = ControlPanelClient("panel_01", "OWNER", port=port, on_update=updates.append)
+
+    try:
+        await client.connect()
+        await client.read_loop()
+        actuators = client.state["nodes"][0]["actuators"]
+        assert actuators[0]["state"] == "ON"
+        assert actuators[1]["state"] == "OFF"
+        assert updates[-1] == actuator_state
+    finally:
+        await client.disconnect()
+        server.close()
+        await server.wait_closed()
