@@ -72,24 +72,70 @@ class ControlPanelClient:
         await self.writer.drain()
         logging.info("Control panel '%s' registered with role %s", self.client_id, self.role)
 
+    async def send_actuator_command(self,
+                                    target_node_id: str,
+                                    actuator_id: str,
+                                    command: str,
+                                    value: int | float | None = None
+                                    ) -> None:
+        """
+        Send an actuator command to the server
+
+        :param target_node_id: id of the target node
+        :param actuator_id: id of the target actuator
+        :param command: the command to send
+        :param value: the value sent along with the command
+        """
+
+        if not self.is_connected or self.writer is None:
+            raise RuntimeError(f"Control panel {self.client_id} not connected")
+
+        message = {
+            "type": MessageType.ACTUATOR_CMD,
+            "target_node_id": target_node_id,
+            "actuator_id": actuator_id,
+            "command": command,
+            "value": value
+        }
+        self.writer.write(encode_message(message))
+        await self.writer.drain()
+        logging.info(
+            "Control panel '%s' sent command %s to %s.%s",
+            self.client_id,
+            command,
+            target_node_id,
+            actuator_id
+        )
+
     def _update_state(self, message: dict) -> None:
-        if message["type"] == MessageType.SYSTEM_STATE:
-            self.state_cache = deepcopy(message)
-            return
 
-        if message["type"] != MessageType.SENSOR_DATA:
-            return
+        match message["type"]:
 
-        for node in self.state_cache["nodes"]:
-            if node.get("node_id") != message["node_id"]:
-                continue
-            for sensor in node.get("sensors", []):
-                if sensor.get("id") != message["sensor_id"]:
-                    continue
-                sensor["value"] = message["value"]
-                sensor["unit"] = message["unit"]
-                sensor["timestamp"] = message["timestamp"]
-                return
+            case MessageType.SYSTEM_STATE:
+                self.state_cache = deepcopy(message)
+
+            case MessageType.SENSOR_DATA:
+                for node in self.state_cache["nodes"]:
+                    if node.get("node_id") != message["node_id"]:
+                        continue
+                    for sensor in node.get("sensors", []):
+                        if sensor.get("id") == message["sensor_id"]:
+                            sensor["value"] = message["value"]
+                            sensor["unit"] = message["unit"]
+                            sensor["timestamp"] = message["timestamp"]
+                            return
+
+            case MessageType.ACTUATOR_STATE:
+                for node in self.state_cache["nodes"]:
+                    if node.get("node_id") != message["node_id"]:
+                        continue
+
+                    for actuator in node.get("actuators", []):
+                        if actuator.get("id") == message["actuator_id"]:
+                            actuator["state"] = message["state"]
+                            return
+
+
 
     async def read_loop(self) -> None:
         """Read and process server messages until the connection closes."""

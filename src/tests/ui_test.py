@@ -1,6 +1,7 @@
 import unittest
+from unittest.mock import AsyncMock, MagicMock
 
-from textual.widgets import DataTable
+from textual.widgets import DataTable, Input
 
 from smart_home_automation.common.constants import MessageType
 from smart_home_automation.control_panel.client import ControlPanelClient
@@ -28,7 +29,9 @@ class TestControlPanelUI(unittest.IsolatedAsyncioTestCase):
                             "unit": "percent",
                         },
                     ],
-                    "actuators": [],
+                    "actuators": [
+                        {"id": "fan_1", "type": "fan", "state": "OFF"},
+                    ],
                 }
             ],
         }
@@ -91,3 +94,64 @@ class TestControlPanelUI(unittest.IsolatedAsyncioTestCase):
                     table.get_row_at(0),
                     temperature_before,
                 )
+
+    async def test_actuator_state_updates_existing_row(self):
+        app = ControlPanelApp()
+
+        async with app.run_test():
+            app.handle_server_update(self.snapshot)
+            table = app.query_one("#actuator_table", DataTable)
+
+            self.assertEqual(table.row_count, 1)
+            self.assertEqual(table.get_row_at(0)[:3], ["living_room_01", "fan_1", "fan"])
+            self.assertIn("OFF", table.get_row_at(0)[3])
+
+            app.handle_server_update(
+                {
+                    "type": MessageType.ACTUATOR_STATE,
+                    "node_id": "living_room_01",
+                    "actuator_id": "fan_1",
+                    "state": "ON",
+                    "success": True,
+                }
+            )
+
+            self.assertEqual(table.row_count, 1)
+            self.assertEqual(table.get_row_at(0)[:3], ["living_room_01", "fan_1", "fan"])
+            self.assertIn("ON", table.get_row_at(0)[3])
+
+    async def test_command_input_sends_actuator_command(self):
+        app = ControlPanelApp()
+        mock_client = MagicMock(spec=ControlPanelClient)
+        mock_client.is_connected = True
+        mock_client.send_actuator_command = AsyncMock()
+
+        async with app.run_test() as pilot:
+            app.client = mock_client
+            cmd_input = app.query_one("#cmd_input", Input)
+            cmd_input.focus()
+            cmd_input.value = "set living_room_01 fan_1 on"
+            await pilot.press("enter")
+            await pilot.pause()
+
+            mock_client.send_actuator_command.assert_awaited_once_with(
+                "living_room_01", "fan_1", "ON", None
+            )
+            self.assertEqual(cmd_input.value, "")
+
+    async def test_invalid_command_input_does_not_send(self):
+        app = ControlPanelApp()
+        mock_client = MagicMock(spec=ControlPanelClient)
+        mock_client.is_connected = True
+        mock_client.send_actuator_command = AsyncMock()
+
+        async with app.run_test() as pilot:
+            app.client = mock_client
+            cmd_input = app.query_one("#cmd_input", Input)
+            cmd_input.focus()
+            cmd_input.value = "only_two_tokens bad"
+            await pilot.press("enter")
+            await pilot.pause()
+
+            mock_client.send_actuator_command.assert_not_awaited()
+            self.assertEqual(cmd_input.value, "")
