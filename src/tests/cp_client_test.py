@@ -1,4 +1,5 @@
 import asyncio
+import pytest
 
 from smart_home_automation.common.constants import MessageType
 from smart_home_automation.common.framing import decode_message, encode_message
@@ -142,3 +143,45 @@ async def _test_control_panel_read_loop_updates_cache():
         await client.disconnect()
         server.close()
         await server.wait_closed()
+
+def test_control_panel_sends_actuator_command_over_tcp():
+    asyncio.run(_test_control_panel_sends_actuator_command_over_tcp())
+
+async def _test_control_panel_sends_actuator_command_over_tcp():
+    received = []
+
+    async def receive_messages(reader, writer):
+        received.append(decode_message(await reader.readline()))
+        received.append(decode_message(await reader.readline()))
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(receive_messages, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    client = ControlPanelClient("panel_01", "OWNER", port=port)
+
+    try:
+        await client.register()
+        await client.send_actuator_command("living_room_01", "fan_1", "ON")
+        await asyncio.sleep(0)
+        await client.disconnect()
+    finally:
+        server.close()
+        await server.wait_closed()
+
+    assert received[1] == {
+        "type": MessageType.ACTUATOR_CMD,
+        "target_node_id": "living_room_01",
+        "actuator_id": "fan_1",
+        "command": "ON",
+        "value": None,
+    }
+
+def test_send_actuator_command_requires_connection():
+    asyncio.run(_test_send_actuator_command_requires_connection())
+
+async def _test_send_actuator_command_requires_connection():
+    client = ControlPanelClient("panel_01", "OWNER")
+
+    with pytest.raises(RuntimeError, match="not connected"):
+        await client.send_actuator_command("living_room_01", "fan_01", "ON")
