@@ -6,7 +6,7 @@ from typing import Self
 
 from smart_home_automation.common.constants import DEFAULT_PORT, ErrorCode, MessageType
 from smart_home_automation.common.framing import decode_message, encode_message
-from smart_home_automation.common.messages import create_error_message
+from smart_home_automation.common.messages import ProtocolError, create_error_message
 
 from .actuators import Actuator
 from .sensors import Sensor
@@ -157,7 +157,20 @@ class SensorActuatorNode:
                     if not line:
                         logging.info("Server closed the connection")
                         break
-                    message = decode_message(line)
+                    try:
+                        message = decode_message(line)
+                    except ProtocolError as error:
+                        logging.warning(
+                            "Protocol error from server: %s - %s",
+                            error.code,
+                            error.message,
+                        )
+                        self.writer.write(
+                            encode_message(create_error_message(error.code, error.message))
+                        )
+                        await self.writer.drain()
+                        continue
+
                     if message["type"] == MessageType.ACTUATOR_CMD:
                         await self.handle_command(message)
 

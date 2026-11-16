@@ -160,6 +160,60 @@ async def _test_node_executes_incoming_actuator_command():
     ]
 
 
+def test_node_reports_protocol_error_and_continues_processing():
+    asyncio.run(_test_node_reports_protocol_error_and_continues_processing())
+
+
+async def _test_node_reports_protocol_error_and_continues_processing():
+    received = []
+
+    async def handle_connection(reader, writer):
+        await reader.readline()
+        writer.write(b"not valid json\n")
+        await writer.drain()
+        received.append(decode_message(await reader.readline()))
+
+        command = {
+            "type": MessageType.ACTUATOR_CMD,
+            "target_node_id": "living_room_01",
+            "actuator_id": "fan_1",
+            "command": ActuatorState.ON,
+            "value": None,
+        }
+        writer.write(encode_message(command))
+        await writer.drain()
+        received.append(decode_message(await reader.readline()))
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(handle_connection, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    node = SensorActuatorNode(
+        "living_room_01",
+        actuators=[FanActuator("fan_1")],
+        port=port,
+    )
+
+    await asyncio.wait_for(node.run(), timeout=5)
+    server.close()
+    await server.wait_closed()
+
+    assert received == [
+        {
+            "type": MessageType.ERROR,
+            "code": ErrorCode.MALFORMED_JSON,
+            "message": "Expecting value: line 1 column 1 (char 0)",
+        },
+        {
+            "type": MessageType.ACTUATOR_STATE,
+            "node_id": "living_room_01",
+            "actuator_id": "fan_1",
+            "state": ActuatorState.ON.value,
+            "success": True,
+        },
+    ]
+
+
 def test_node_rejects_unknown_actuator():
     asyncio.run(_test_node_rejects_unknown_actuator())
 
