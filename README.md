@@ -19,6 +19,16 @@ uv run server
 ```
 
 ```console
+uv run node --id ID     Unique node ID for a custom node, for example kitchen_01.
+    --sensor TYPE:ID    Add a sensor, for example temperature:temp_1. Repeatable.
+    --actuator TYPE:ID  Add an actuator, for example fan:fan_1. Repeatable.
+```
+
+```console
+uv run node --help
+```
+
+```console
 uv run sensor
 ```
 

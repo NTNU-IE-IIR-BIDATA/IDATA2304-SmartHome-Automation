@@ -2,7 +2,7 @@ import asyncio
 
 from smart_home_automation.common.constants import ActuatorState, ErrorCode, MessageType, SensorType
 from smart_home_automation.common.framing import decode_message, encode_message
-from smart_home_automation.node import create_default_node
+from smart_home_automation.node import _parse_arguments, create_node
 from smart_home_automation.node.actuators import FanActuator
 from smart_home_automation.node.node import SensorActuatorNode
 from smart_home_automation.node.sensors import HumiditySensor, TemperatureSensor
@@ -24,11 +24,38 @@ def test_node_builds_register_node_message():
     }
 
 
-def test_create_default_node():
-    node = create_default_node()
-    assert node.node_id == "living_room_01"
-    assert len(node.sensors) == 2
-    assert len(node.actuators) == 1
+def test_create_node_with_selected_components():
+    node = create_node(
+        "kitchen_01",
+        sensors=[("temperature", "kitchen_temp_1")],
+        actuators=[("fan", "kitchen_fan_1")],
+    )
+
+    assert node.node_id == "kitchen_01"
+    assert [sensor.id for sensor in node.sensors] == ["kitchen_temp_1"]
+    assert [actuator.id for actuator in node.actuators] == ["kitchen_fan_1"]
+
+
+def test_parse_custom_node_arguments():
+    arguments = _parse_arguments(
+        [
+            "--id",
+            "kitchen_01",
+            "--sensor",
+            "temperature:kitchen_temp_1",
+            "--sensor",
+            "smoke:kitchen_smoke_1",
+            "--actuator",
+            "fan:kitchen_fan_1",
+        ]
+    )
+
+    assert arguments.id == "kitchen_01"
+    assert arguments.sensors == [
+        ("temperature", "kitchen_temp_1"),
+        ("smoke", "kitchen_smoke_1"),
+    ]
+    assert arguments.actuators == [("fan", "kitchen_fan_1")]
 
 
 def test_node_sends_register_node_over_tcp():
