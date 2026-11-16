@@ -19,6 +19,24 @@ class Actuator:
     def manifest(self) -> dict[str, str]:
         return {"id": self.id, "type": self.type, "state": self.state.value}
 
+    def execute(self, command: str, value: float | int | None = None) -> bool:
+        """Apply a supported command and return whether it was accepted."""
+        allowed_states = {
+            "fan": {ActuatorState.ON, ActuatorState.OFF},
+            "heater": {ActuatorState.ON, ActuatorState.OFF},
+            "lock": {ActuatorState.OPEN, ActuatorState.CLOSED},
+        }
+        try:
+            new_state = ActuatorState(command.upper())
+        except (AttributeError, ValueError):
+            return False
+
+        if new_state not in allowed_states.get(self.type, set()):
+            return False
+
+        self.state = new_state
+        return True
+
 
 class FanActuator(Actuator):
     def __init__(self, actuator_id: str) -> None:
