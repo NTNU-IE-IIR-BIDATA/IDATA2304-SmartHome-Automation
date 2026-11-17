@@ -42,6 +42,7 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
     parser = argparse.ArgumentParser(description="Start a Smart Home Control Panel.")
     parser.add_argument(
         "--id",
+        default="panel_1",
         help="Unique client ID for a control panel. Default: 'panel_1'"
     )
     parser.add_argument(

@@ -85,6 +85,7 @@ class ControlPanelApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+
         table = self.query_one("#sensor_table", DataTable)
         table.cursor_type = "row"
         table.add_columns("Node", "Sensor", "Type", "Value", "Unit", "Status", "Updated")
@@ -98,6 +99,7 @@ class ControlPanelApp(App):
         node_table.add_columns("Node", "Status")
 
         if self.client is not None:
+            self.sub_title = f"{self.client.client_id} {self.client.role}"
             self.client.on_update = self.handle_server_update
             self.run_worker(self._run_client(), name="panel-client")
 
@@ -110,7 +112,7 @@ class ControlPanelApp(App):
         try:
             await self.client.run()
         except OSError as error:
-            log.write(f"Connection error: {error}")
+            self.query_one("#alert_log", RichLog).write(f"[bold red]Connection error: {error}[/bold red]")
         else:
             log.write("Connection to server closed")
 
@@ -134,7 +136,7 @@ class ControlPanelApp(App):
 
         if len(parts) not in (3, 4):
             log.write(
-                "[yellow]Usage: <node_id> <actuator_id> <command> [value][/yellow]"
+                "[yellow]Usage: <node_id|ALL> <actuator_id|ALL> <command> [value][/yellow]"
             )
             return
 
@@ -171,7 +173,9 @@ class ControlPanelApp(App):
                 self.load_system_state(message)
 
             case MessageType.ERROR:
-                self.query_one("#alert_log", RichLog).write(f"Server error: {message['message']}")
+                self.query_one("#alert_log", RichLog).write(
+                    f"[bold red]ERROR: ({message['code']}): {message['message']}[/bold red]"
+                )
 
             case MessageType.ACTUATOR_STATE:
                 self._handle_actuator_state_update(message)
@@ -230,6 +234,7 @@ class ControlPanelApp(App):
                         sensor_type,
                         sensor["value"],
                         unit,
+                        log_alerts=False
                     )
                 else:
                     row_key = table.add_row(
@@ -258,6 +263,7 @@ class ControlPanelApp(App):
         sensor_type: SensorType,
         value: str | int | float | bool,
         unit: str,
+        log_alerts: bool = True
     ) -> None:
 
         table = self.query_one("#sensor_table", DataTable)
@@ -268,10 +274,12 @@ class ControlPanelApp(App):
         if anomaly:
             if anomaly.severity == AnomalySeverity.CRITICAL:  # critical anomaly
                 status_text = "[bold red]CRITICAL[/bold red]"
-                log.write(f"[bold red]CRITICAL ALERT[/bold red]: {anomaly.message}")
+                if log_alerts:
+                    log.write(f"[bold red]CRITICAL ALERT[/bold red]: {anomaly.message}")
             else:  # warning anomaly
                 status_text = "[yellow]WARNING[/yellow]"
-                log.write(f"[yellow]Warning[/yellow]: {anomaly.message}")
+                if log_alerts:
+                    log.write(f"[yellow]Warning[/yellow]: {anomaly.message}")
         else:
             status_text = "[green]OK[/green]"
 

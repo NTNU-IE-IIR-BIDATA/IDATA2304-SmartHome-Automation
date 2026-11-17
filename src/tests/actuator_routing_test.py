@@ -179,7 +179,7 @@ class TestActuatorTCP(unittest.IsolatedAsyncioTestCase):
                         await tasks[0]
                         self.fail("Node stopped before registering")
                     await asyncio.sleep(0.01)
-                tasks.extend(asyncio.create_task(panel.run()) for panel in panels)
+                tasks.extend(asyncio.create_task(panel.run(reconnect_delay=0.1)) for panel in panels)
                 for queue in queues:
                     self.assertEqual((await queue.get())["type"], MessageType.SYSTEM_STATE)
                 for requested, expected, success in [
