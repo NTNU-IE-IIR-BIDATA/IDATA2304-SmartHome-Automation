@@ -2,7 +2,7 @@ import argparse
 import logging
 from typing import Sequence
 
-from common.constants import DEFAULT_HOST, DEFAULT_PORT
+from smart_home_automation.common.constants import DEFAULT_HOST, DEFAULT_PORT
 
 from .client import ControlPanelClient
 from .ui import ControlPanelApp
