@@ -2,17 +2,26 @@ import asyncio
 import logging
 
 from ..common.constants import DEFAULT_PORT, MAX_MESSAGE_SIZE, ErrorCode, MessageType, Role
+from ..common.discovery import DiscoveryServerProtocol
 from ..common.framing import decode_message, encode_message
 from ..common.messages import ProtocolError, create_error_message
 from .state import ServerState
 
 
 class Server:
-    def __init__(self, host: str = "127.0.0.1", port: int = DEFAULT_PORT, state=None):
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = DEFAULT_PORT,
+        state=None,
+        discovery_port: int | None = None,
+    ):
         self.host = host
         self.port = port
         self.state = state if state is not None else ServerState()
         self.server: asyncio.Server | None = None
+        self.discovery_port = discovery_port
+        self._discovery_transport: asyncio.DatagramTransport | None = None
 
     async def start(self):
         """
@@ -26,6 +35,15 @@ class Server:
             limit=MAX_MESSAGE_SIZE,
         )
 
+        if self.discovery_port is not None:
+            tcp_port = self.server.sockets[0].getsockname()[1]
+            loop = asyncio.get_running_loop()
+            self._discovery_transport, _ = await loop.create_datagram_endpoint(
+                lambda: DiscoveryServerProtocol(tcp_port),
+                local_addr=(self.host, self.discovery_port),
+            )
+            logging.info(f"Discoverer listening on {self.host} {self.discovery_port}")
+
         addrs = ", ".join(str(sock.getsockname()) for sock in self.server.sockets)
         logging.info(f"Server listening on {addrs}")
 
@@ -34,6 +52,10 @@ class Server:
 
     async def stop(self):
         """Stop the server gracefully"""
+
+        if self._discovery_transport is not None:
+            self._discovery_transport.close()
+            self._discovery_transport = None
 
         if self.server:
             self.server.close()

@@ -3,7 +3,7 @@ import asyncio
 import logging
 from typing import Sequence
 
-from smart_home_automation.common.constants import DEFAULT_HOST, DEFAULT_PORT
+from smart_home_automation.common.constants import DEFAULT_HOST, DEFAULT_PORT, DISCOVERY_PORT
 
 from .server import Server
 
@@ -41,7 +41,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
     )
     parsed = _parse_arguments(arguments)
 
-    server = Server(host=parsed.host, port=parsed.port)
+    server = Server(host=parsed.host, port=parsed.port, discovery_port=DISCOVERY_PORT)
 
     try:
         asyncio.run(run_server(server))

@@ -1,8 +1,10 @@
 import argparse
+import asyncio
 import logging
 from typing import Sequence
 
 from smart_home_automation.common.constants import DEFAULT_HOST, DEFAULT_PORT, Role
+from smart_home_automation.common.discovery import discover_server
 
 from .client import ControlPanelClient
 from .ui import ControlPanelApp
@@ -49,6 +51,11 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
         help=f"Host address of the server to connect to. Default: {DEFAULT_HOST}",
     )
     parser.add_argument(
+        "--discover",
+        action="store_true",
+        help="Discover the server automatically instead of providing a host and port",
+    )
+    parser.add_argument(
         "--port",
         type=int,
         default=DEFAULT_PORT,
@@ -60,9 +67,16 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
 def main(arguments: Sequence[str] | None = None) -> None:
     """Entry point of 'uv run control_panel'"""
     parsed = _parse_arguments(arguments)
-    control_panel = create_control_panel(
-        panel_id=parsed.id, role=parsed.role, host=parsed.host, port=parsed.port
-    )
+    host, port = parsed.host, parsed.port
+
+    if parsed.discover:
+        try:
+            host, port = asyncio.run(discover_server())
+            logging.info(f"Discovered server at {host} {port}")
+        except TimeoutError:
+            logging.info("Discovery timed out")
+            return
+    control_panel = create_control_panel(panel_id=parsed.id, role=parsed.role, host=host, port=port)
     start_control_panel(control_panel)
 
 
