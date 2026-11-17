@@ -231,6 +231,7 @@ All messages must contain the `type` field.
 - **Unknown or missing fields**: Not silently ignored. The recipient returns `ERR_INVALID_SCHEMA`, specifying which field was missing or invalid.
 - **Unreachable target node**: If a panel sends `ACTUATOR_CMD` to a node which is not registered or recently disconnected, the server returns `ERR_NODE_NOT_FOUND` to the panel.
 - **Unauthorized operation**: If a control panel with the role `GUEST` tries to perform an action reserved for `OWNER`, the server rejects the request with `ERR_AUTH_FAILED` without forwarding it to the sensor node
+- **Repeated protocol violations**: After three consecutive malformed or invalid messages, the server sends the final error response and closes the TCP session.
 
 ## 11. Example Scenario
 
@@ -265,7 +266,7 @@ If a sensor node loses connection, the server marks the node `connected: false` 
 
 **Role-based access control**: The server functions as an authorization service based on the role given under registration (`SHA_ADMIN`, `OWNER`, `GUEST`, `TECHNICIAN`)
 
-**Data sanity checks**: The server validates that command and ID strings are alphanumerical to prevent injection attacks or state interruptions.
+**Data sanity checks**: The server validates that command and ID strings contain only letters, numbers, underscores, or hyphens to prevent injection attacks or state interruptions.
 
 ## 14. Assumptions
 
@@ -273,6 +274,6 @@ If a sensor node loses connection, the server marks the node `connected: false` 
 
 **Unique ID's**: Every sensor node is configured with a unique ID string on startup. The server rejects connection requests if a node attempts to register with an already active `node_id`.
 
-**Message size**: No single-line-JSON should exceed 64KiB to avoid memory overload by parsing in buffer as a security measure against malicious intent.
+**Message size**: No single-line-JSON should exceed 64KiB. Oversized messages are rejected as `ERR_MALFORMED_JSON`, and the server limits its line reader to prevent unbounded buffering.
 
 **Anomaly detection**: Control panels evaluate incoming data against known threshold rules (e.g. temperatures exceeding an unsafe limit) to trigger anomaly warnings in the user interface.

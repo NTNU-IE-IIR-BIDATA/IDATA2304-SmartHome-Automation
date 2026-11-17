@@ -148,43 +148,62 @@ class SensorActuatorNode:
                 logging.info(f"Node '{self.node_id}' disconnected")
 
     async def run(self) -> None:
-        """Register the node, then send and receive concurrently"""
+        """Register the node, then reconnect with backoff if the connection drops."""
         self._running = True
+        retry_delay = 1.0
 
         try:
-            await self.register()
+            while self._running:
+                try:
+                    await self.register()
+                    retry_delay = 1.0
 
-            async with asyncio.TaskGroup() as tasks:
-                telemetry_task = tasks.create_task(self.telemetry_loop())
+                    async with asyncio.TaskGroup() as tasks:
+                        telemetry_task = tasks.create_task(self.telemetry_loop())
 
-                while self._running and self.is_connected and self.reader is not None:
-                    line = await self.reader.readline()
+                        while self._running and self.is_connected and self.reader is not None:
+                            line = await self.reader.readline()
 
-                    if not line:
-                        logging.info("Server closed the connection")
-                        break
-                    try:
-                        message = decode_message(line)
-                    except ProtocolError as error:
-                        logging.warning(
-                            "Protocol error from server: %s - %s",
-                            error.code,
-                            error.message,
-                        )
-                        self.writer.write(
-                            encode_message(create_error_message(error.code, error.message))
-                        )
-                        await self.writer.drain()
-                        continue
+                            if not line:
+                                logging.info("Server closed the connection")
+                                break
+                            try:
+                                message = decode_message(line)
+                            except ProtocolError as error:
+                                logging.warning(
+                                    "Protocol error from server: %s - %s",
+                                    error.code,
+                                    error.message,
+                                )
+                                if self.writer is not None:
+                                    self.writer.write(
+                                        encode_message(
+                                            create_error_message(error.code, error.message)
+                                        )
+                                    )
+                                    await self.writer.drain()
+                                continue
 
-                    if message["type"] == MessageType.ACTUATOR_CMD:
-                        await self.handle_command(message)
+                            if message["type"] == MessageType.ACTUATOR_CMD:
+                                await self.handle_command(message)
 
-                telemetry_task.cancel()
+                        telemetry_task.cancel()
+                except (ConnectionError, OSError) as error:
+                    logging.warning(
+                        "Node '%s' connection failed: %s; retrying in %.1f seconds",
+                        self.node_id,
+                        error,
+                        retry_delay,
+                    )
+                finally:
+                    await self.disconnect()
+
+                if self._running:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, 30.0)
 
         finally:
             self._running = False
-            await self.disconnect()
 
     def stop(self) -> None:
         """Signal SAN loop to stop."""

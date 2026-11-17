@@ -36,7 +36,7 @@ VALID_MESSAGES = [
         "target_node_id": "living_room_01",
         "actuator_id": "fan_1",
         "command": "ON",
-        "value": None,
+        "value": 1,
     },
     {
         "type": MessageType.ACTUATOR_STATE,
@@ -146,3 +146,36 @@ def test_invalid_field_type_is_rejected(message, invalid_field):
         validate_message(message)
 
     assert error.value.code == ErrorCode.INVALID_SCHEMA
+
+
+@pytest.mark.parametrize(
+    ("message_type", "field"),
+    [
+        (MessageType.REGISTER_NODE, "node_id"),
+        (MessageType.REGISTER_PANEL, "client_id"),
+        (MessageType.SENSOR_DATA, "sensor_id"),
+        (MessageType.ACTUATOR_CMD, "target_node_id"),
+        (MessageType.ACTUATOR_CMD, "actuator_id"),
+        (MessageType.ACTUATOR_CMD, "command"),
+    ],
+)
+def test_unsafe_string_fields_are_rejected(message_type, field):
+    message = {
+        "type": message_type,
+        "node_id": "room",
+        "client_id": "panel",
+        "sensor_id": "temp_1",
+        "target_node_id": "room",
+        "actuator_id": "fan_1",
+        "command": "ON",
+        "value": 1,
+        "unit": "celsius",
+        "timestamp": 1,
+        "role": "OWNER",
+        "sensors": [],
+        "actuators": [],
+    }
+    message[field] = "../unsafe"
+
+    with pytest.raises(ProtocolError, match=field):
+        validate_message(message)

@@ -51,6 +51,18 @@ class TestActuatorRouting(unittest.IsolatedAsyncioTestCase):
             panel.write.assert_not_called()
         self.assertEqual(self.server.state.get_actuator("room", "fan_1")["state"], "OFF")
 
+    async def test_all_wildcard_reaches_every_matching_node(self):
+        message = command(target_node_id="ALL")
+
+        await self.dispatch(message, self.panels[0])
+
+        self.node.write.assert_called_once_with(
+            encode_message(message | {"target_node_id": "room"})
+        )
+        self.other_node.write.assert_called_once_with(
+            encode_message(message | {"target_node_id": "other_room"})
+        )
+
     async def test_invalid_targets_return_errors_to_panel(self):
         for message, code in [
             (command(target_node_id="missing"), ErrorCode.NODE_NOT_FOUND),
@@ -187,7 +199,10 @@ class TestActuatorTCP(unittest.IsolatedAsyncioTestCase):
                 ]:
                     await panels[0].send_actuator_command("room", "fan_1", requested)
                     for queue in queues:
-                        self.assertEqual(await queue.get(), confirmation(state=expected, success=success))
+                        self.assertEqual(
+                            await queue.get(),
+                            confirmation(state=expected, success=success),
+                        )
                     self.assertEqual(fan.state.value, expected)
                     self.assertEqual(server.state.get_actuator("room", "fan_1")["state"], expected)
                     for panel in panels:
