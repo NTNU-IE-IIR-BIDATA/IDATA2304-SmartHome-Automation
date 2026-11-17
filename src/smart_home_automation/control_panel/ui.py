@@ -22,13 +22,20 @@ class ControlPanelApp(App):
         height: 1fr;
     }
     #sensors_panel {
-        width: 3fr;
+        width: 4fr;
         height: 1fr;
         padding-right: 1;
+        padding-left: 1;
     }
     #actuator_panel {
+        width: 3fr;
+        height: 1fr;
+        padding-right:1;
+    }
+    #node_panel {
         width: 2fr;
         height: 1fr;
+        padding-right: 1;
     }
     #alerts_panel {
         height: 10;
@@ -52,16 +59,20 @@ class ControlPanelApp(App):
         self.detector = AnomalyDetector()
         self._sensor_rows = {}
         self._actuator_rows = {}
+        self._node_connected: dict[str, bool] = {}
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Horizontal(id="tables_container"):
             with Vertical(id="sensors_panel"):
                 yield Static("Sensors", classes="section_title")
-                yield DataTable(id="sensor_table")
+                yield DataTable(id="sensor_table", cursor_foreground_priority="renderable")
             with Vertical(id="actuator_panel"):
                 yield Static("Actuators", classes="section_title")
-                yield DataTable(id="actuator_table")
+                yield DataTable(id="actuator_table", cursor_foreground_priority="renderable")
+            with Vertical(id="node_panel"):
+                yield Static("Nodes", classes="section_title")
+                yield DataTable(id="node_table", cursor_foreground_priority="renderable")
 
         with Vertical(id="alerts_panel"):
             yield Static("Anomaly Feed")
@@ -81,6 +92,10 @@ class ControlPanelApp(App):
         actuator_table = self.query_one("#actuator_table", DataTable)
         actuator_table.cursor_type = "row"
         actuator_table.add_columns("Node", "Actuator", "Type", "State", "Updated")
+
+        node_table = self.query_one("#node_table", DataTable)
+        node_table.cursor_type = "row"
+        node_table.add_columns("Node", "Status")
 
         if self.client is not None:
             self.client.on_update = self.handle_server_update
@@ -177,8 +192,31 @@ class ControlPanelApp(App):
         actuator_table.clear()
         self._actuator_rows.clear()
 
+        node_table = self.query_one("#node_table", DataTable)
+        node_table.clear()
+
+        log = self.query_one("#alert_log", RichLog)
+
         for node in state.get("nodes", []):
             node_id = node["node_id"]
+            connected = node.get("connected", True)
+            was_connected = self._node_connected.get(node_id)
+
+            if was_connected is None and not connected:
+                log.write(f"[red]Node {node_id} is offline[/red]")
+            elif was_connected is True and not connected:
+                log.write(f"[red]Node {node_id} not connected[/red]")
+            elif was_connected is False and connected:
+                log.write(f"[green]Node {node_id} reconnected[/green]")
+
+            status = "[green]Connected[/green]" if connected else "[red]Not Connected[/red]"
+
+            self._node_connected[node_id] = connected
+
+            node_table.add_row(
+                node_id,
+                status
+            )
 
             for sensor in node.get("sensors", []):
                 sensor_id = sensor["id"]
