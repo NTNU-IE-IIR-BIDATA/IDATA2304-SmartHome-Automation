@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from ..common.constants import DEFAULT_PORT, MAX_MESSAGE_SIZE, ErrorCode, MessageType
+from ..common.constants import DEFAULT_PORT, MAX_MESSAGE_SIZE, ErrorCode, MessageType, Role
 from ..common.framing import decode_message, encode_message
 from ..common.messages import ProtocolError, create_error_message
 from .state import ServerState
@@ -132,19 +132,112 @@ class Server:
             case MessageType.ACTUATOR_STATE:
                 await self._handle_actuator_state(message, writer, peer)
 
+            case MessageType.ERROR:
+                await self._handle_node_error(message, writer, peer)
+
             case _:
                 logging.warning(f"Unhandled message type {msg_type} from {peer}")
 
+    async def _handle_node_error(self, message, writer, peer):
+        node_id = None
+
+        for node in self.state.system_state()["nodes"]:
+            candidate_id = node["node_id"]
+            if self.state.get_connection(candidate_id) is writer:
+                node_id = candidate_id
+                break
+
+        if node_id is None:
+            logging.warning(
+                "Ignoring ERROR from an unregistered node connection: %s",
+                peer,
+            )
+            return
+
+        error = create_error_message(
+            message["code"],
+            f"Node {node_id}: {message['message']}",
+        )
+
+        await self._broadcast_sensor_data(error)
+
+        logging.warning(
+            "Node %s reported %s: %s",
+            node_id,
+            message["code"],
+            message["message"],
+        )
+
+    def _resolve_actuator_targets(self, node_id, actuator_id):
+        if node_id == "ALL":
+            nodes = [
+                node
+                for node in self.state.system_state()["nodes"]
+                if self.state.get_connection(node["node_id"]) is not None
+            ]
+        else:
+            node = self.state.get_node(node_id)
+            if node is None or self.state.get_connection(node_id) is None:
+                raise ProtocolError(
+                    ErrorCode.NODE_NOT_FOUND,
+                    f"Node {node_id} is not connected",
+                )
+            nodes = [node]
+
+        if not nodes:
+            raise ProtocolError(
+                ErrorCode.NODE_NOT_FOUND,
+                "No connected nodes found",
+            )
+
+        targets = []
+
+        for node in nodes:
+            for actuator in node["actuators"]:
+                if actuator_id == "ALL" or actuator["id"] == actuator_id:
+                    targets.append((node["node_id"], actuator))
+
+        if not targets:
+            raise ProtocolError(
+                ErrorCode.ACTUATOR_NOT_FOUND,
+                f"No matching actuators found for {node_id}.{actuator_id}",
+            )
+
+        return targets
+
     async def _handle_actuator_command(self, message, writer, peer):
-        if not any(
-                connection is writer
-                for connection in self.state.get_panel_connections()
-        ):
+        role = self.state.get_panel_role(writer)
+
+        if role is None:
             raise ProtocolError(
                 ErrorCode.AUTH_FAILED,
                 "Only registered control panels can send actuator commands",
             )
 
+        targets = self._resolve_actuator_targets(
+            message["target_node_id"],
+            message["actuator_id"],
+        )
+
+        for node_id, actuator in targets:
+            allowed = (
+                role in (Role.ADMIN, Role.OWNER)
+                or (
+                        role == Role.GUEST
+                        and actuator["type"] == "fan"
+                        and message["command"] in ("ON", "OFF")
+                )
+            )
+
+            if not allowed:
+                raise ProtocolError(
+                    ErrorCode.AUTH_FAILED,
+                    f"Role {role} cannot control "
+                    f"{node_id}.{actuator['id']}",
+                )
+
+        for node_id, actuator in targets:
+            node_writer = self.state.get_connection(node_id)
         target_node_id = message["target_node_id"]
         target_actuator_id = message["actuator_id"]
         targets = []
@@ -169,7 +262,28 @@ class Server:
                 ErrorCode.ACTUATOR_NOT_FOUND,
                 f"Actuator {target_actuator_id} not found",
             )
+            if node_writer is None:
+                raise ProtocolError(
+                    ErrorCode.NODE_NOT_FOUND,
+                    f"Node {node_id} is not connected",
+            )
 
+            forwarded = {
+                **message,
+                "target_node_id": node_id,
+                "actuator_id": actuator["id"],
+            }
+
+            try:
+                node_writer.write(encode_message(forwarded))
+                await node_writer.drain()
+            except OSError as error:
+                self.state.disconnect(node_writer)
+                node_writer.close()
+                raise ProtocolError(
+                    ErrorCode.EXECUTION_FAILED,
+                    f"Could not send command to node {node_id}",
+                ) from error
         for node_id, actuator_id in targets:
             node_writer = self.state.get_connection(node_id)
             forwarded = message | {
@@ -187,6 +301,13 @@ class Server:
                     ErrorCode.EXECUTION_FAILED,
                     f"Could not send command to node {node_id}",
                 ) from error
+
+            logging.info(
+                "Forwarded command %s to %s.%s",
+                message["command"],
+                node_id,
+                actuator["id"],
+            )
 
             logging.info(
                 "Forwarded command %s to %s.%s",
@@ -252,7 +373,6 @@ class Server:
         actuators = message.get("actuators", [])
 
         self.state.register_node(node_id, sensors, actuators, writer)
-        await self._broadcast_system_state()
 
         logging.info(
             f"Node {node_id} registered from {peer} with "

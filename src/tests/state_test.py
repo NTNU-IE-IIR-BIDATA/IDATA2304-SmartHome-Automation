@@ -2,7 +2,7 @@ import asyncio
 import json
 import unittest
 
-from smart_home_automation.common.constants import ErrorCode, SensorType
+from smart_home_automation.common.constants import ErrorCode, Role, SensorType
 from smart_home_automation.common.messages import ProtocolError
 from smart_home_automation.server.server import Server
 from smart_home_automation.server.state import ServerState
@@ -253,3 +253,42 @@ class TestStateTCP(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestPanelRoles(unittest.TestCase):
+    def test_valid_roles_are_registered(self):
+        for role in Role:
+            with self.subTest(role=role):
+                state = ServerState()
+                connection = object()
+
+                state.register_panel("panel", role.value, connection)
+
+                self.assertEqual(state.get_panel_role(connection), role)
+
+    def test_invalid_roles_are_rejected(self):
+        for role in ["UNKNOWN", "", "owner", None, 123]:
+            with self.subTest(role=role):
+                state = ServerState()
+                connection = object()
+
+                with self.assertRaises(ProtocolError) as error:
+                    state.register_panel("panel", role, connection)
+
+                self.assertEqual(
+                    error.exception.code,
+                    ErrorCode.AUTH_FAILED,
+                )
+                self.assertIsNone(state.get_panel_role(connection))
+                self.assertEqual(state.get_panel_connections(), [])
+
+    def test_role_lookup_after_disconnect(self):
+        state = ServerState()
+        connection = object()
+
+        self.assertIsNone(state.get_panel_role(connection))
+
+        state.register_panel("panel", "OWNER", connection)
+        self.assertEqual(state.get_panel_role(connection), Role.OWNER)
+
+        state.disconnect(connection)
+        self.assertIsNone(state.get_panel_role(connection))

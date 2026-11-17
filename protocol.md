@@ -65,15 +65,32 @@ A push based system minimizes bandwidth usage, and ensures an immediate response
 ## 8. Types, constants and special values
 
 ### Reserved identifiers
-`ALL`: Used as wildcard in fields for `target_node_id` or `actuator_id` for joint commands (multicast/broadcast). 
-Wildcard expansion is handled by the server. if `target_node` is `ALL`, the server iterates over all registered nodes and dispatches individual commands to each relevant socket.
+`ALL`: Reserved wildcard value for `target_node_id` and `actuator_id`.
+The server expands wildcard commands as described under `ACTUATOR_CMD`.
 
 ### Roles and access levels (Control Panel)
+
+The server validates the supplied role against `Role`. Unknown roles
+are rejected with `ERR_AUTH_FAILED`. The registered role is associated
+with the panel's connection and used to authorize actuator commands.
+
+#### Actuator permissions
 
 - `SHA_ADMIN`: Full access to all nodes, sensors, actuators, rules and diagnostics
 - `OWNER`: Full control of all units inside the building
 - `GUEST`: Read-only access to chosen sensors, limited access to chosen actuators
 - `TECHNICIAN`: Read-only access to diagnostics, resetting of alarms, no access to critical actuators (e.g. main door lock)
+
+| Role | Allowed actuator commands |
+|---|---|
+| SHA_ADMIN | All supported actuator commands |
+| OWNER | All supported actuator commands |
+| GUEST | ON and OFF for fans only |
+| TECHNICIAN | No commands for fan, heater or lock actuators |
+
+Actuator commands require a registered control-panel connection.
+Unauthorized commands are rejected with `ERR_AUTH_FAILED` before
+being forwarded to a node.
 
 ### Actuator states
 
@@ -87,7 +104,7 @@ Wildcard expansion is handled by the server. if `target_node` is `ALL`, the serv
 - `ERR_INVALID_SCHEMA`: Required fields missing or contains wrong data type
 - `ERR_NODE_NOT_FOUND`: Target node not connected/does not exist
 - `ERR_ACTUATOR_NOT_FOUND`: Requested actuator does not exist on the node
-- `ERR_EXECUTION_FAILED`: Hardware/actuator error on the sensor node
+- `ERR_EXECUTION_FAILED`: Actuator execution failure or failure to forward a command to the target node.
 
 ## 9. Message format and catalog
 
@@ -195,6 +212,31 @@ All messages must contain the `type` field.
 }
 ```
 
+##### Wildcard targets
+
+The value `ALL` is supported in `target_node_id` and `actuator_id`:
+
+- `target_node_id = "ALL"` selects all connected nodes.
+- `actuator_id = "ALL"` selects all actuators on the selected nodes.
+- A specific actuator ID combined with `target_node_id = "ALL"`
+  selects matching actuators across connected nodes. Nodes without
+  that actuator are skipped.
+
+The server expands wildcard targets into individual commands containing
+concrete node and actuator IDs.
+
+If no connected target nodes exist, the server returns
+`ERR_NODE_NOT_FOUND`. If connected target nodes exist but no actuators
+match, it returns `ERR_ACTUATOR_NOT_FOUND`.
+
+Permissions are checked for all matching actuators before any command
+is forwarded. If any target is unauthorized, the entire request is
+rejected with `ERR_AUTH_FAILED`.
+
+Commands are forwarded sequentially. If forwarding fails, the server
+returns `ERR_EXECUTION_FAILED` and stops forwarding the remaining
+commands. Commands already sent are not rolled back.
+
 #### Actuator state update: `ACTUATOR_STATE`
 
 **Direction**: SAN → Server, then forward to Server → CP.
@@ -213,9 +255,11 @@ All messages must contain the `type` field.
 
 #### Error message: `ERROR`
 
-**Direction**: Server → Client (CP or SAN).
+**Direction**: Server → Client (CP or SAN); SAN → Server.
 
-**Description**: Reporting breaches of protocol rules.
+**Description**: Reports protocol errors and node failures. Errors received
+from registered sensor-actuator nodes are forwarded to all registered
+control panels.
 
 ```JSON
 {
@@ -232,6 +276,16 @@ All messages must contain the `type` field.
 - **Unreachable target node**: If a panel sends `ACTUATOR_CMD` to a node which is not registered or recently disconnected, the server returns `ERR_NODE_NOT_FOUND` to the panel.
 - **Unauthorized operation**: If a control panel with the role `GUEST` tries to perform an action reserved for `OWNER`, the server rejects the request with `ERR_AUTH_FAILED` without forwarding it to the sensor node
 - **Repeated protocol violations**: After three consecutive malformed or invalid messages, the server sends the final error response and closes the TCP session.
+
+The server sends errors to clients when a request cannot be processed.
+
+When a registered node sends an `ERROR`, the server identifies the node
+using its connection and forwards the error to all registered control
+panels. The original error code is preserved, and the message is
+prefixed with `Node <node_id>:`.
+
+Errors received from connections that are not registered as nodes are
+ignored. Receiving a node error does not change cached device state.
 
 ## 11. Example Scenario
 
