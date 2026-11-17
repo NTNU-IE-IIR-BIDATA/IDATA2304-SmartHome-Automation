@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import ssl
 from collections.abc import Callable
 from copy import deepcopy
 from typing import Self
@@ -7,6 +8,7 @@ from typing import Self
 from ..common.constants import DEFAULT_PORT, MessageType
 from ..common.framing import decode_message, encode_message
 from ..common.messages import ProtocolError
+from ..common.tls import create_client_context
 
 
 class ControlPanelClient:
@@ -19,6 +21,7 @@ class ControlPanelClient:
         host: str = "127.0.0.1",
         port: int = DEFAULT_PORT,
         on_update: Callable[[dict], None] | None = None,
+        ca_file: str | None = None,
     ) -> None:
         if not client_id:
             raise ValueError("client_id must not be empty")
@@ -29,6 +32,7 @@ class ControlPanelClient:
         self.role = role
         self.host = host
         self.port = port
+        self.ca_file = ca_file
         self.on_update = on_update
         self.reader: asyncio.StreamReader | None = None
         self.writer: asyncio.StreamWriter | None = None
@@ -59,7 +63,15 @@ class ControlPanelClient:
         if self.is_connected:
             return
 
-        self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
+        tls_context: ssl.SSLContext | None = None
+        if self.ca_file is not None:
+            tls_context = create_client_context(self.ca_file)
+        self.reader, self.writer = await asyncio.open_connection(
+            self.host,
+            self.port,
+            ssl=tls_context,
+            server_hostname=self.host if tls_context is not None else None,
+        )
         logging.info("Control panel '%s' connected to %s:%s", self.client_id, self.host, self.port)
 
     async def register(self) -> None:

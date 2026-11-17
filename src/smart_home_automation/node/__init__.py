@@ -21,6 +21,7 @@ def create_node(
     actuators: Sequence[tuple[str, str]] = (),
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
+    ca_file: str | None = None,
 ) -> SensorActuatorNode:
     """Create a node with as many sensor and actuator you want"""
     return SensorActuatorNode(
@@ -31,6 +32,7 @@ def create_node(
         ],
         host=host,
         port=port,
+        ca_file=ca_file,
     )
 
 
@@ -72,6 +74,7 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
         default=DEFAULT_PORT,
         help=f"Server TCP port (default: {DEFAULT_PORT}).",
     )
+    parser.add_argument("--ca-file", help="CA certificate file used to verify the TLS server.")
 
     sensor_types = ", ".join(sensor.value for sensor in SensorType)
     actuator_types = ", ".join(actuator.value for actuator in ActuatorType)
@@ -128,6 +131,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
             parsed.actuators,
             host=parsed.host,
             port=parsed.port,
+            ca_file=parsed.ca_file,
         )
         asyncio.run(start_node(node))
     except KeyboardInterrupt:

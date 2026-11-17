@@ -1,0 +1,16 @@
+import ssl
+from os import PathLike
+
+
+def create_server_context(
+    cert_file: str | PathLike[str], key_file: str | PathLike[str]
+) -> ssl.SSLContext:
+    """Create a TLS server context using a certificate and private key."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(certfile=cert_file, keyfile=key_file)
+    return context
+
+
+def create_client_context(ca_file: str | PathLike[str]) -> ssl.SSLContext:
+    """Create a TLS client context that verifies the server certificate."""
+    return ssl.create_default_context(cafile=ca_file)

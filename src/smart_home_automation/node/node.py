@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import ssl
 import time
 from collections.abc import Sequence
 from typing import Self
@@ -13,6 +14,7 @@ from smart_home_automation.common.constants import (
 )
 from smart_home_automation.common.framing import decode_message, encode_message
 from smart_home_automation.common.messages import ProtocolError, create_error_message
+from smart_home_automation.common.tls import create_client_context
 
 from .actuators import Actuator
 from .sensors import Sensor
@@ -28,6 +30,7 @@ class SensorActuatorNode:
         actuators: Sequence[Actuator] = (),
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
+        ca_file: str | None = None,
     ) -> None:
         if not node_id:
             raise ValueError("node_id must not be empty")
@@ -36,6 +39,7 @@ class SensorActuatorNode:
         self.actuators = tuple(actuators)
         self.host = host
         self.port = port
+        self.ca_file = ca_file
         self.reader: asyncio.StreamReader | None = None
         self.writer: asyncio.StreamWriter | None = None
         self._running: bool = False
@@ -117,7 +121,15 @@ class SensorActuatorNode:
         """Establish TCP connection to the server if not already connected."""
         if self.is_connected:
             return
-        self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
+        tls_context: ssl.SSLContext | None = None
+        if self.ca_file is not None:
+            tls_context = create_client_context(self.ca_file)
+        self.reader, self.writer = await asyncio.open_connection(
+            self.host,
+            self.port,
+            ssl=tls_context,
+            server_hostname=self.host if tls_context is not None else None,
+        )
         logging.info(f"Node '{self.node_id}' connected to {self.host}:{self.port}")
 
     async def register(self) -> None:
