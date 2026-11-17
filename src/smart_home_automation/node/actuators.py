@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from smart_home_automation.common.constants import ActuatorState
+from smart_home_automation.common.constants import ActuatorState, ActuatorType
 
 
 @dataclass
@@ -40,24 +40,24 @@ class Actuator:
 
 class FanActuator(Actuator):
     def __init__(self, actuator_id: str) -> None:
-        super().__init__(actuator_id, "fan", ActuatorState.OFF)
+        super().__init__(actuator_id, ActuatorType.FAN.value, ActuatorState.OFF)
 
 
 class HeaterActuator(Actuator):
     def __init__(self, actuator_id: str) -> None:
-        super().__init__(actuator_id, "heater", ActuatorState.OFF)
+        super().__init__(actuator_id, ActuatorType.HEATER.value, ActuatorState.OFF)
 
 
 class LockActuator(Actuator):
     def __init__(self, actuator_id: str) -> None:
-        super().__init__(actuator_id, "lock", ActuatorState.CLOSED)
+        super().__init__(actuator_id, ActuatorType.LOCK.value, ActuatorState.CLOSED)
 
 
 def create_actuator(actuator_type: str, actuator_id: str) -> Actuator:
     actuators = {
-        "fan": FanActuator,
-        "heater": HeaterActuator,
-        "lock": LockActuator,
+        ActuatorType.FAN.value: FanActuator,
+        ActuatorType.HEATER.value: HeaterActuator,
+        ActuatorType.LOCK.value: LockActuator,
     }
     try:
         actuator_class = actuators[actuator_type.lower()]

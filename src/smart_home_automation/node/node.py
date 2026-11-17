@@ -4,9 +4,15 @@ import time
 from collections.abc import Sequence
 from typing import Self
 
-from smart_home_automation.common.constants import DEFAULT_PORT, ErrorCode, MessageType
+from smart_home_automation.common.constants import (
+    DEFAULT_HOST,
+    DEFAULT_PORT,
+    TELEMETRY_INTERVAL,
+    ErrorCode,
+    MessageType,
+)
 from smart_home_automation.common.framing import decode_message, encode_message
-from smart_home_automation.common.messages import create_error_message
+from smart_home_automation.common.messages import ProtocolError, create_error_message
 
 from .actuators import Actuator
 from .sensors import Sensor
@@ -20,7 +26,7 @@ class SensorActuatorNode:
         node_id: str,
         sensors: Sequence[Sensor] = (),
         actuators: Sequence[Actuator] = (),
-        host: str = "127.0.0.1",
+        host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
     ) -> None:
         if not node_id:
@@ -71,7 +77,41 @@ class SensorActuatorNode:
     async def telemetry_loop(self) -> None:
         while self._running and self.is_connected:
             await self.send_sensor_data()
-            await asyncio.sleep(5)
+            await asyncio.sleep(TELEMETRY_INTERVAL)
+
+    async def handle_command(self, message: dict) -> None:
+        """Execute an actuator command and send its state confirmation."""
+        actuator_id = message["actuator_id"]
+        actuator = next(
+            (candidate for candidate in self.actuators if candidate.id == actuator_id),
+            None,
+        )
+        if actuator is None:
+            if self.writer is None:
+                raise RuntimeError(f"Node '{self.node_id}' is not connected")
+
+            error = create_error_message(
+                ErrorCode.ACTUATOR_NOT_FOUND,
+                f"Actuator {actuator_id} does not exist on node {self.node_id}.",
+            )
+            self.writer.write(encode_message(error))
+            await self.writer.drain()
+            logging.warning("Actuator '%s' was not found on node '%s'", actuator_id, self.node_id)
+            return
+
+        success = actuator.execute(message["command"], message["value"])
+        if self.writer is None:
+            raise RuntimeError(f"Node '{self.node_id}' is not connected")
+
+        response = {
+            "type": MessageType.ACTUATOR_STATE,
+            "node_id": self.node_id,
+            "actuator_id": actuator.id,
+            "state": actuator.state.value,
+            "success": success,
+        }
+        self.writer.write(encode_message(response))
+        await self.writer.drain()
 
     async def handle_command(self, message: dict) -> None:
         """Execute an actuator command and send its state confirmation."""
@@ -157,7 +197,20 @@ class SensorActuatorNode:
                     if not line:
                         logging.info("Server closed the connection")
                         break
-                    message = decode_message(line)
+                    try:
+                        message = decode_message(line)
+                    except ProtocolError as error:
+                        logging.warning(
+                            "Protocol error from server: %s - %s",
+                            error.code,
+                            error.message,
+                        )
+                        self.writer.write(
+                            encode_message(create_error_message(error.code, error.message))
+                        )
+                        await self.writer.drain()
+                        continue
+
                     if message["type"] == MessageType.ACTUATOR_CMD:
                         await self.handle_command(message)
 

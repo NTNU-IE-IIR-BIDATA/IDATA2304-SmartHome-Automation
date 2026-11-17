@@ -1,8 +1,15 @@
 import asyncio
 
-from smart_home_automation.common.constants import ActuatorState, ErrorCode, MessageType, SensorType
+from smart_home_automation.common.constants import (
+    ActuatorState,
+    ActuatorType,
+    ErrorCode,
+    MessageType,
+    SensorType,
+    SensorUnit,
+)
 from smart_home_automation.common.framing import decode_message, encode_message
-from smart_home_automation.node import create_default_node
+from smart_home_automation.node import _parse_arguments, create_node
 from smart_home_automation.node.actuators import FanActuator
 from smart_home_automation.node.node import SensorActuatorNode
 from smart_home_automation.node.sensors import HumiditySensor, TemperatureSensor
@@ -19,16 +26,47 @@ def test_node_builds_register_node_message():
     assert node.registration_message() == {
         "type": MessageType.REGISTER_NODE,
         "node_id": "living_room_01",
-        "sensors": [{"id": "temp_1", "type": SensorType.TEMPERATURE.value, "unit": "celsius"}],
-        "actuators": [{"id": "fan_1", "type": "fan", "state": ActuatorState.OFF.value}],
+        "sensors": [
+            {"id": "temp_1", "type": SensorType.TEMPERATURE.value, "unit": SensorUnit.CELSIUS.value}
+        ],
+        "actuators": [
+            {"id": "fan_1", "type": ActuatorType.FAN.value, "state": ActuatorState.OFF.value}
+        ],
     }
 
 
-def test_create_default_node():
-    node = create_default_node()
-    assert node.node_id == "living_room_01"
-    assert len(node.sensors) == 2
-    assert len(node.actuators) == 1
+def test_create_node_with_selected_components():
+    node = create_node(
+        "kitchen_01",
+        sensors=[(SensorType.TEMPERATURE.value, "kitchen_temp_1")],
+        actuators=[(ActuatorType.FAN.value, "kitchen_fan_1")],
+    )
+
+    assert node.node_id == "kitchen_01"
+    assert [sensor.id for sensor in node.sensors] == ["kitchen_temp_1"]
+    assert [actuator.id for actuator in node.actuators] == ["kitchen_fan_1"]
+
+
+def test_parse_custom_node_arguments():
+    arguments = _parse_arguments(
+        [
+            "--id",
+            "kitchen_01",
+            "--sensor",
+            f"{SensorType.TEMPERATURE.value}:kitchen_temp_1",
+            "--sensor",
+            f"{SensorType.SMOKE.value}:kitchen_smoke_1",
+            "--actuator",
+            f"{ActuatorType.FAN.value}:kitchen_fan_1",
+        ]
+    )
+
+    assert arguments.id == "kitchen_01"
+    assert arguments.sensors == [
+        (SensorType.TEMPERATURE.value, "kitchen_temp_1"),
+        (SensorType.SMOKE.value, "kitchen_smoke_1"),
+    ]
+    assert arguments.actuators == [(ActuatorType.FAN.value, "kitchen_fan_1")]
 
 
 def test_node_sends_register_node_over_tcp():
@@ -157,6 +195,60 @@ async def _test_node_executes_incoming_actuator_command():
             "state": ActuatorState.ON.value,
             "success": True,
         }
+    ]
+
+
+def test_node_reports_protocol_error_and_continues_processing():
+    asyncio.run(_test_node_reports_protocol_error_and_continues_processing())
+
+
+async def _test_node_reports_protocol_error_and_continues_processing():
+    received = []
+
+    async def handle_connection(reader, writer):
+        await reader.readline()
+        writer.write(b"not valid json\n")
+        await writer.drain()
+        received.append(decode_message(await reader.readline()))
+
+        command = {
+            "type": MessageType.ACTUATOR_CMD,
+            "target_node_id": "living_room_01",
+            "actuator_id": "fan_1",
+            "command": ActuatorState.ON,
+            "value": None,
+        }
+        writer.write(encode_message(command))
+        await writer.drain()
+        received.append(decode_message(await reader.readline()))
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(handle_connection, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    node = SensorActuatorNode(
+        "living_room_01",
+        actuators=[FanActuator("fan_1")],
+        port=port,
+    )
+
+    await asyncio.wait_for(node.run(), timeout=5)
+    server.close()
+    await server.wait_closed()
+
+    assert received == [
+        {
+            "type": MessageType.ERROR,
+            "code": ErrorCode.MALFORMED_JSON,
+            "message": "Expecting value: line 1 column 1 (char 0)",
+        },
+        {
+            "type": MessageType.ACTUATOR_STATE,
+            "node_id": "living_room_01",
+            "actuator_id": "fan_1",
+            "state": ActuatorState.ON.value,
+            "success": True,
+        },
     ]
 
 

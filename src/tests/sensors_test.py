@@ -1,6 +1,6 @@
 import pytest
 
-from smart_home_automation.common.constants import SensorType
+from smart_home_automation.common.constants import SensorType, SensorUnit
 from smart_home_automation.node.sensors import (
     AirQualitySensor,
     HumiditySensor,
@@ -17,21 +17,21 @@ def test_sensor_manifests():
     assert TemperatureSensor("temp_1").manifest() == {
         "id": "temp_1",
         "type": SensorType.TEMPERATURE.value,
-        "unit": "celsius",
+        "unit": SensorUnit.CELSIUS.value,
     }
-    assert HumiditySensor("hum_1").manifest()["unit"] == "percent"
+    assert HumiditySensor("hum_1").manifest()["unit"] == SensorUnit.PERCENT.value
 
 
 @pytest.mark.parametrize(
     ("sensor_type", "sensor_class", "unit", "value_type"),
     [
-        (SensorType.TEMPERATURE.value, TemperatureSensor, "celsius", float),
-        (SensorType.HUMIDITY.value, HumiditySensor, "percent", float),
-        (SensorType.SMOKE.value, SmokeDetector, "boolean", bool),
-        (SensorType.AIR_QUALITY.value, AirQualitySensor, "aqi", float),
-        (SensorType.POWER.value, PowerSensor, "watts", float),
-        (SensorType.MOTION.value, MotionSensor, "boolean", bool),
-        (SensorType.LEAK.value, LeakDetector, "boolean", bool),
+        (SensorType.TEMPERATURE.value, TemperatureSensor, SensorUnit.CELSIUS.value, float),
+        (SensorType.HUMIDITY.value, HumiditySensor, SensorUnit.PERCENT.value, float),
+        (SensorType.SMOKE.value, SmokeDetector, SensorUnit.BOOLEAN.value, bool),
+        (SensorType.AIR_QUALITY.value, AirQualitySensor, SensorUnit.AQI.value, float),
+        (SensorType.POWER.value, PowerSensor, SensorUnit.WATTS.value, float),
+        (SensorType.MOTION.value, MotionSensor, SensorUnit.BOOLEAN.value, bool),
+        (SensorType.LEAK.value, LeakDetector, SensorUnit.BOOLEAN.value, bool),
     ],
 )
 def test_simulated_sensors_have_valid_manifests_and_values(

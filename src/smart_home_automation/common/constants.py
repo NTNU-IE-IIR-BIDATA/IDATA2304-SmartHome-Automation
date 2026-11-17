@@ -1,6 +1,8 @@
 from enum import StrEnum
 
 DEFAULT_PORT = 5555  # Default port for the smart home automation system
+DEFAULT_HOST = "127.0.0.1"
+TELEMETRY_INTERVAL = 5
 WILDCARD = "ALL"  # Used to indicate all nodes or panels
 MAX_MESSAGE_SIZE = 64 * 1024  # 64 KiB
 
@@ -38,6 +40,12 @@ class ActuatorState(StrEnum):
     CLOSED = "CLOSED"
 
 
+class ActuatorType(StrEnum):
+    FAN = "fan"
+    HEATER = "heater"
+    LOCK = "lock"
+
+
 class SensorType(StrEnum):
     TEMPERATURE = "temperature"
     HUMIDITY = "humidity"
@@ -46,6 +54,14 @@ class SensorType(StrEnum):
     POWER = "power"
     MOTION = "motion"
     LEAK = "leak"
+
+
+class SensorUnit(StrEnum):
+    CELSIUS = "celsius"
+    PERCENT = "percent"
+    BOOLEAN = "boolean"
+    AQI = "aqi"
+    WATTS = "watts"
 
 
 class AnomalySeverity(StrEnum):

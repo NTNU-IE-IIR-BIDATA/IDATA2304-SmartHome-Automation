@@ -1,6 +1,6 @@
 import pytest
 
-from smart_home_automation.common.constants import ActuatorState
+from smart_home_automation.common.constants import ActuatorState, ActuatorType
 from smart_home_automation.node.actuators import (
     FanActuator,
     HeaterActuator,
@@ -13,7 +13,7 @@ def test_actuator_manifests():
     assert FanActuator("fan_1").manifest()["state"] == ActuatorState.OFF.value
     assert HeaterActuator("heater_1").manifest()["state"] == ActuatorState.OFF.value
     assert LockActuator("lock_1").manifest()["state"] == ActuatorState.CLOSED.value
-    assert create_actuator("LOCK", "lock_2").state == ActuatorState.CLOSED
+    assert create_actuator(ActuatorType.LOCK.value.upper(), "lock_2").state == ActuatorState.CLOSED
 
 
 @pytest.mark.parametrize(
