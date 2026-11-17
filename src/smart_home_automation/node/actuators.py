@@ -22,9 +22,9 @@ class Actuator:
     def execute(self, command: str, value: float | int | None = None) -> bool:
         """Apply a supported command and return whether it was accepted."""
         allowed_states = {
-            "fan": {ActuatorState.ON, ActuatorState.OFF},
-            "heater": {ActuatorState.ON, ActuatorState.OFF},
-            "lock": {ActuatorState.OPEN, ActuatorState.CLOSED},
+            ActuatorType.FAN: {ActuatorState.ON, ActuatorState.OFF},
+            ActuatorType.HEATER: {ActuatorState.ON, ActuatorState.OFF},
+            ActuatorType.LOCK: {ActuatorState.OPEN, ActuatorState.CLOSED},
         }
         try:
             new_state = ActuatorState(command.upper())
