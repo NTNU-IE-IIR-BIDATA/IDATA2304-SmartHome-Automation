@@ -1,31 +1,42 @@
+import argparse
 import asyncio
 import logging
+from collections.abc import Sequence
 
-from smart_home_automation.common.constants import SensorType
+from smart_home_automation.common.constants import (
+    DEFAULT_HOST,
+    DEFAULT_PORT,
+    ActuatorType,
+    SensorType,
+)
 
 from .actuators import create_actuator
 from .node import SensorActuatorNode, run_node
 from .sensors import create_sensor
 
 
-def create_default_node() -> SensorActuatorNode:
-    """Create a default Sensor-Actuator Node for development and demonstration."""
+def create_node(
+    node_id: str,
+    sensors: Sequence[tuple[str, str]] = (),
+    actuators: Sequence[tuple[str, str]] = (),
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+) -> SensorActuatorNode:
+    """Create a node with as many sensor and actuator you want"""
     return SensorActuatorNode(
-        node_id="living_room_01",
-        sensors=[
-            create_sensor(SensorType.TEMPERATURE.value, "temp_1"),
-            create_sensor(SensorType.HUMIDITY.value, "hum_1"),
-        ],
+        node_id=node_id,
+        sensors=[create_sensor(sensor_type, sensor_id) for sensor_type, sensor_id in sensors],
         actuators=[
-            create_actuator("fan", "fan_1"),
+            create_actuator(actuator_type, actuator_id)
+            for actuator_type, actuator_id in actuators
         ],
+        host=host,
+        port=port,
     )
 
 
-async def start_node(node: SensorActuatorNode | None = None) -> None:
+async def start_node(node: SensorActuatorNode) -> None:
     """Run the node client lifecycle."""
-    if node is None:
-        node = create_default_node()
     logging.info(
         f"Starting node '{node.node_id}' with {len(node.sensors)} sensor(s) "
         f"and {len(node.actuators)} actuator(s)"
@@ -38,14 +49,66 @@ async def start_node(node: SensorActuatorNode | None = None) -> None:
         await node.disconnect()
 
 
-def main() -> None:
-    """Entry point for 'uv run node'."""
+
+def _parse_component_spec(spec: str, component: str) -> tuple[str, str]:
+    """Parse a CLI component specification in ``TYPE:ID`` format."""
+    component_type, separator, component_id = spec.partition(":")
+    if not separator or not component_type or not component_id or ":" in component_id:
+        raise ValueError(f"{component} must use TYPE:ID format: {spec}")
+    return component_type, component_id
+
+
+def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Start a Smart Home sensor-actuator node.")
+    parser.add_argument("--id", help="Unique node ID for a custom node.")
+
+    sensor_types = ", ".join(sensor.value for sensor in SensorType)
+    actuator_types = ", ".join(actuator.value for actuator in ActuatorType)
+
+    parser.add_argument(
+        "--sensor",
+        action="append",
+        default=[],
+        metavar="TYPE:ID",
+        help="Add a sensor, for example temperature:temp_1. Available types: " + sensor_types + ". Repeatable.",
+    )
+    parser.add_argument(
+        "--actuator",
+        action="append",
+        default=[],
+        metavar="TYPE:ID",
+        help="Add an actuator, for example fan:fan_1. Available types: " + actuator_types + ". Repeatable.",
+    )
+    parsed = parser.parse_args(arguments)
+
+    if parsed.id is None:
+        parser.error("--id is required")
+    if not parsed.sensor and not parsed.actuator:
+        parser.error("at least one --sensor or --actuator is required")
+
+    try:
+        parsed.sensors = [
+            _parse_component_spec(spec, "Sensor") for spec in parsed.sensor
+        ]
+        parsed.actuators = [
+            _parse_component_spec(spec, "Actuator") for spec in parsed.actuator
+        ]
+    except ValueError as error:
+        parser.error(str(error))
+
+    return parsed
+
+
+def main(arguments: Sequence[str] | None = None) -> None:
+    """Entry point for ``uv run node``."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
+    parsed = _parse_arguments(arguments)
     try:
-        asyncio.run(start_node())
+        node = create_node(parsed.id, parsed.sensors, parsed.actuators)
+        asyncio.run(start_node(node))
     except KeyboardInterrupt:
         logging.info("Node shutdown complete.")
 

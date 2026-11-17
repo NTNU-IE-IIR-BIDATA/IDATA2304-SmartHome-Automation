@@ -4,7 +4,13 @@ import time
 from collections.abc import Sequence
 from typing import Self
 
-from smart_home_automation.common.constants import DEFAULT_PORT, ErrorCode, MessageType
+from smart_home_automation.common.constants import (
+    DEFAULT_HOST,
+    DEFAULT_PORT,
+    TELEMETRY_INTERVAL,
+    ErrorCode,
+    MessageType,
+)
 from smart_home_automation.common.framing import decode_message, encode_message
 from smart_home_automation.common.messages import ProtocolError, create_error_message
 
@@ -20,7 +26,7 @@ class SensorActuatorNode:
         node_id: str,
         sensors: Sequence[Sensor] = (),
         actuators: Sequence[Actuator] = (),
-        host: str = "127.0.0.1",
+        host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
     ) -> None:
         if not node_id:
@@ -71,7 +77,7 @@ class SensorActuatorNode:
     async def telemetry_loop(self) -> None:
         while self._running and self.is_connected:
             await self.send_sensor_data()
-            await asyncio.sleep(5)
+            await asyncio.sleep(TELEMETRY_INTERVAL)
 
     async def handle_command(self, message: dict) -> None:
         """Execute an actuator command and send its state confirmation."""
