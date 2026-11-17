@@ -3,7 +3,12 @@ import asyncio
 import logging
 from collections.abc import Sequence
 
-from smart_home_automation.common.constants import DEFAULT_PORT
+from smart_home_automation.common.constants import (
+    DEFAULT_HOST,
+    DEFAULT_PORT,
+    ActuatorType,
+    SensorType,
+)
 
 from .actuators import create_actuator
 from .node import SensorActuatorNode, run_node
@@ -14,10 +19,10 @@ def create_node(
     node_id: str,
     sensors: Sequence[tuple[str, str]] = (),
     actuators: Sequence[tuple[str, str]] = (),
-    host: str = "127.0.0.1",
+    host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
 ) -> SensorActuatorNode:
-    """Create a node from ``(type, id)`` sensor and actuator definitions."""
+    """Create a node with as many sensor and actuator you want"""
     return SensorActuatorNode(
         node_id=node_id,
         sensors=[create_sensor(sensor_type, sensor_id) for sensor_type, sensor_id in sensors],
@@ -56,19 +61,23 @@ def _parse_component_spec(spec: str, component: str) -> tuple[str, str]:
 def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Start a Smart Home sensor-actuator node.")
     parser.add_argument("--id", help="Unique node ID for a custom node.")
+
+    sensor_types = ", ".join(sensor.value for sensor in SensorType)
+    actuator_types = ", ".join(actuator.value for actuator in ActuatorType)
+
     parser.add_argument(
         "--sensor",
         action="append",
         default=[],
         metavar="TYPE:ID",
-        help="Add a sensor, for example temperature:temp_1. Repeatable.",
+        help="Add a sensor, for example temperature:temp_1. Available types: " + sensor_types + ". Repeatable.",
     )
     parser.add_argument(
         "--actuator",
         action="append",
         default=[],
         metavar="TYPE:ID",
-        help="Add an actuator, for example fan:fan_1. Repeatable.",
+        help="Add an actuator, for example fan:fan_1. Available types: " + actuator_types + ". Repeatable.",
     )
     parsed = parser.parse_args(arguments)
 

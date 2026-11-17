@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from smart_home_automation.common.constants import ActuatorState
+from smart_home_automation.common.constants import ActuatorState, ActuatorType
 
 
 @dataclass
@@ -22,9 +22,9 @@ class Actuator:
     def execute(self, command: str, value: float | int | None = None) -> bool:
         """Apply a supported command and return whether it was accepted."""
         allowed_states = {
-            "fan": {ActuatorState.ON, ActuatorState.OFF},
-            "heater": {ActuatorState.ON, ActuatorState.OFF},
-            "lock": {ActuatorState.OPEN, ActuatorState.CLOSED},
+            ActuatorType.FAN.value: {ActuatorState.ON, ActuatorState.OFF},
+            ActuatorType.HEATER.value: {ActuatorState.ON, ActuatorState.OFF},
+            ActuatorType.LOCK.value: {ActuatorState.OPEN, ActuatorState.CLOSED},
         }
         try:
             new_state = ActuatorState(command.upper())
@@ -40,24 +40,24 @@ class Actuator:
 
 class FanActuator(Actuator):
     def __init__(self, actuator_id: str) -> None:
-        super().__init__(actuator_id, "fan", ActuatorState.OFF)
+        super().__init__(actuator_id, ActuatorType.FAN.value, ActuatorState.OFF)
 
 
 class HeaterActuator(Actuator):
     def __init__(self, actuator_id: str) -> None:
-        super().__init__(actuator_id, "heater", ActuatorState.OFF)
+        super().__init__(actuator_id, ActuatorType.HEATER.value, ActuatorState.OFF)
 
 
 class LockActuator(Actuator):
     def __init__(self, actuator_id: str) -> None:
-        super().__init__(actuator_id, "lock", ActuatorState.CLOSED)
+        super().__init__(actuator_id, ActuatorType.LOCK.value, ActuatorState.CLOSED)
 
 
 def create_actuator(actuator_type: str, actuator_id: str) -> Actuator:
     actuators = {
-        "fan": FanActuator,
-        "heater": HeaterActuator,
-        "lock": LockActuator,
+        ActuatorType.FAN.value: FanActuator,
+        ActuatorType.HEATER.value: HeaterActuator,
+        ActuatorType.LOCK.value: LockActuator,
     }
     try:
         actuator_class = actuators[actuator_type.lower()]
