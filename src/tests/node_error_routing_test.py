@@ -11,6 +11,7 @@ def make_writer():
     writer.drain = AsyncMock()
     return writer
 
+
 class TestNodeErrorRouting(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.server = Server()
@@ -22,9 +23,7 @@ class TestNodeErrorRouting(unittest.IsolatedAsyncioTestCase):
 
         self.panels = [make_writer(), make_writer()]
         for index, panel in enumerate(self.panels):
-            self.server.state.register_panel(
-                f"panel_{index}", "OWNER", panel
-            )
+            self.server.state.register_panel(f"panel_{index}", "OWNER", panel)
 
         self.error = {
             "type": MessageType.ERROR,
@@ -47,11 +46,14 @@ class TestNodeErrorRouting(unittest.IsolatedAsyncioTestCase):
         for panel in self.panels:
             panel.write.assert_called_once()
             reply = decode_message(panel.write.call_args.args[0])
-            self.assertEqual(reply, {
-                "type": MessageType.ERROR,
-                "code": ErrorCode.EXECUTION_FAILED,
-                "message": "Node room: Fan could not start",
-            })
+            self.assertEqual(
+                reply,
+                {
+                    "type": MessageType.ERROR,
+                    "code": ErrorCode.EXECUTION_FAILED,
+                    "message": "Node room: Fan could not start",
+                },
+            )
             panel.drain.assert_awaited_once()
 
         self.node.write.assert_not_called()
@@ -95,13 +97,8 @@ class TestNodeErrorRouting(unittest.IsolatedAsyncioTestCase):
         await self.dispatch(self.node)
 
         broken.close.assert_called_once()
-        self.assertEqual(
-            self.server.state.get_panel_connections(), [healthy]
-        )
+        self.assertEqual(self.server.state.get_panel_connections(), [healthy])
         healthy.write.assert_called_once()
         healthy.drain.assert_awaited_once()
         reply = decode_message(healthy.write.call_args.args[0])
-        self.assertEqual(
-            reply["message"], "Node room: Fan could not start"
-        )
-
+        self.assertEqual(reply["message"], "Node room: Fan could not start")

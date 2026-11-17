@@ -16,7 +16,7 @@ class ServerState:
         except (ValueError, TypeError):
             raise ProtocolError(
                 ErrorCode.AUTH_FAILED,
-        f"Unknown panel role: {role}",
+                f"Unknown panel role: {role}",
             ) from None
         if not isinstance(client_id, str) or not client_id.strip():
             raise ProtocolError(ErrorCode.INVALID_SCHEMA, "Invalid client_id")
@@ -149,9 +149,7 @@ class ServerState:
 
         return None
 
-    def update_actuator_state(
-            self, node_id, actuator_id, state, connection=None
-    ):
+    def update_actuator_state(self, node_id, actuator_id, state, connection=None):
         if node_id not in self._nodes:
             raise ProtocolError(
                 ErrorCode.NODE_NOT_FOUND,

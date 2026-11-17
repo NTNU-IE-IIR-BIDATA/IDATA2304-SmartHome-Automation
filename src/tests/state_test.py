@@ -254,6 +254,7 @@ class TestStateTCP(unittest.IsolatedAsyncioTestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
 class TestPanelRoles(unittest.TestCase):
     def test_valid_roles_are_registered(self):
         for role in Role:

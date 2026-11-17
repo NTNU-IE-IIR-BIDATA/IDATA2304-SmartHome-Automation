@@ -220,76 +220,32 @@ class Server:
         )
 
         for node_id, actuator in targets:
-            allowed = (
-                role in (Role.ADMIN, Role.OWNER)
-                or (
-                        role == Role.GUEST
-                        and actuator["type"] == "fan"
-                        and message["command"] in ("ON", "OFF")
-                )
+            allowed = role in (Role.ADMIN, Role.OWNER) or (
+                role == Role.GUEST
+                and actuator["type"] == "fan"
+                and message["command"] in ("ON", "OFF")
             )
 
             if not allowed:
                 raise ProtocolError(
                     ErrorCode.AUTH_FAILED,
-                    f"Role {role} cannot control "
-                    f"{node_id}.{actuator['id']}",
+                    f"Role {role} cannot control {node_id}.{actuator['id']}",
                 )
 
         for node_id, actuator in targets:
             node_writer = self.state.get_connection(node_id)
-        target_node_id = message["target_node_id"]
-        target_actuator_id = message["actuator_id"]
-        targets = []
 
-        for node in self.state.system_state()["nodes"]:
-            node_id = node["node_id"]
-            if not node["connected"]:
-                continue
-            if target_node_id != "ALL" and target_node_id != node_id:
-                continue
-            for actuator in node["actuators"]:
-                if target_actuator_id == "ALL" or target_actuator_id == actuator["id"]:
-                    targets.append((node_id, actuator["id"]))
-
-        if not targets:
-            if target_node_id != "ALL" and self.state.get_connection(target_node_id) is None:
-                raise ProtocolError(
-                    ErrorCode.NODE_NOT_FOUND,
-                    f"Node {target_node_id} is not connected",
-                )
-            raise ProtocolError(
-                ErrorCode.ACTUATOR_NOT_FOUND,
-                f"Actuator {target_actuator_id} not found",
-            )
             if node_writer is None:
                 raise ProtocolError(
                     ErrorCode.NODE_NOT_FOUND,
                     f"Node {node_id} is not connected",
-            )
+                )
 
-            forwarded = {
-                **message,
+            forwarded = message | {
                 "target_node_id": node_id,
                 "actuator_id": actuator["id"],
             }
 
-            try:
-                node_writer.write(encode_message(forwarded))
-                await node_writer.drain()
-            except OSError as error:
-                self.state.disconnect(node_writer)
-                node_writer.close()
-                raise ProtocolError(
-                    ErrorCode.EXECUTION_FAILED,
-                    f"Could not send command to node {node_id}",
-                ) from error
-        for node_id, actuator_id in targets:
-            node_writer = self.state.get_connection(node_id)
-            forwarded = message | {
-                "target_node_id": node_id,
-                "actuator_id": actuator_id,
-            }
             try:
                 node_writer.write(encode_message(forwarded))
                 await node_writer.drain()
@@ -307,13 +263,6 @@ class Server:
                 message["command"],
                 node_id,
                 actuator["id"],
-            )
-
-            logging.info(
-                "Forwarded command %s to %s.%s",
-                message["command"],
-                node_id,
-                actuator_id,
             )
 
     async def _handle_actuator_state(self, message, writer, peer):

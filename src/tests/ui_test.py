@@ -134,7 +134,6 @@ class TestControlPanelUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(table.row_count, 1)
             self.assertEqual(table.get_row_at(0), ["living_room_01", "[red]Not Connected[/red]"])
 
-
     async def test_command_input_sends_actuator_command(self):
         app = ControlPanelApp()
         mock_client = MagicMock(spec=ControlPanelClient)

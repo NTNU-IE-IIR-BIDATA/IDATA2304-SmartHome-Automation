@@ -38,6 +38,7 @@ def confirmation(**changes):
     )
     return message | changes
 
+
 class TestActuatorRouting(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.server = Server()
@@ -174,6 +175,7 @@ class TestActuatorRouting(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.server.state.get_actuator("missing", "fan_1"))
         self.assertIsNone(self.server.state.get_actuator("room", "missing"))
 
+
 class TestActuatorTCP(unittest.IsolatedAsyncioTestCase):
     async def test_real_node_and_two_panels_on_off_and_invalid_command(self):
         server = Server()
@@ -205,7 +207,9 @@ class TestActuatorTCP(unittest.IsolatedAsyncioTestCase):
                         await tasks[0]
                         self.fail("Node stopped before registering")
                     await asyncio.sleep(0.01)
-                tasks.extend(asyncio.create_task(panel.run(reconnect_delay=0.1)) for panel in panels)
+                tasks.extend(
+                    asyncio.create_task(panel.run(reconnect_delay=0.1)) for panel in panels
+                )
                 for queue in queues:
                     self.assertEqual((await queue.get())["type"], MessageType.SYSTEM_STATE)
                 for requested, expected, success in [
@@ -213,11 +217,7 @@ class TestActuatorTCP(unittest.IsolatedAsyncioTestCase):
                     ("OFF", "OFF", True),
                     ("OPEN", "OFF", False),
                 ]:
-                    await panels[0].send_actuator_command(
-                        "room",
-                        "fan_1",
-                        requested
-                    )
+                    await panels[0].send_actuator_command("room", "fan_1", requested)
                     for queue in queues:
                         self.assertEqual(
                             await queue.get(), confirmation(state=expected, success=success)
@@ -419,4 +419,3 @@ class TestActuatorWildcards(unittest.IsolatedAsyncioTestCase):
         for node in nodes:
             node.write.assert_not_called()
             node.drain.assert_not_awaited()
-

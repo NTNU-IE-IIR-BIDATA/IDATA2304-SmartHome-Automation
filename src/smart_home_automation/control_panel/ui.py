@@ -80,7 +80,7 @@ class ControlPanelApp(App):
 
         yield Input(
             placeholder="Command: <node_id> <actuator_id> <ON|OFF|OPEN|CLOSED> [value]",
-            id = "cmd_input"
+            id="cmd_input",
         )
         yield Footer()
 
@@ -116,7 +116,9 @@ class ControlPanelApp(App):
         try:
             await self.client.run()
         except OSError as error:
-            self.query_one("#alert_log", RichLog).write(f"[bold red]Connection error: {error}[/bold red]")
+            self.query_one("#alert_log", RichLog).write(
+                f"[bold red]Connection error: {error}[/bold red]"
+            )
         else:
             log.write("Connection to server closed")
 
@@ -139,9 +141,7 @@ class ControlPanelApp(App):
             parts = parts[1:]
 
         if len(parts) not in (3, 4):
-            log.write(
-                "[yellow]Usage: <node_id|ALL> <actuator_id|ALL> <command> [value][/yellow]"
-            )
+            log.write("[yellow]Usage: <node_id|ALL> <actuator_id|ALL> <command> [value][/yellow]")
             return
 
         target_node_id, target_actuator_id, command = parts[0], parts[1], parts[2].upper()
@@ -162,17 +162,12 @@ class ControlPanelApp(App):
         except (OSError, RuntimeError) as error:
             log.write(f"[bold red]Failed to send command: {error}[/bold red]")
 
-
-
-
-
     def action_clear_alerts(self) -> None:
         self.query_one("#alert_log", RichLog).clear()
 
     def handle_server_update(self, message: dict) -> None:
 
         match message["type"]:
-
             case MessageType.SYSTEM_STATE:
                 self.load_system_state(message)
 
@@ -184,12 +179,8 @@ class ControlPanelApp(App):
             case MessageType.ACTUATOR_STATE:
                 self._handle_actuator_state_update(message)
 
-
             case MessageType.SENSOR_DATA:
                 self._handle_sensor_data(message)
-
-
-
 
     def load_system_state(self, state: dict) -> None:
         table = self.query_one("#sensor_table", DataTable)
@@ -221,10 +212,7 @@ class ControlPanelApp(App):
 
             self._node_connected[node_id] = connected
 
-            node_table.add_row(
-                node_id,
-                status
-            )
+            node_table.add_row(node_id, status)
 
             for sensor in node.get("sensors", []):
                 sensor_id = sensor["id"]
@@ -233,12 +221,7 @@ class ControlPanelApp(App):
 
                 if sensor.get("value") is not None:
                     self.update_sensor(
-                        node_id,
-                        sensor_id,
-                        sensor_type,
-                        sensor["value"],
-                        unit,
-                        log_alerts=False
+                        node_id, sensor_id, sensor_type, sensor["value"], unit, log_alerts=False
                     )
                 else:
                     row_key = table.add_row(
@@ -257,7 +240,7 @@ class ControlPanelApp(App):
                     node_id,
                     actuator["id"],
                     actuator.get("state", "-"),
-                    actuator.get("type", "unknown")
+                    actuator.get("type", "unknown"),
                 )
 
     def update_sensor(
@@ -267,7 +250,7 @@ class ControlPanelApp(App):
         sensor_type: SensorType,
         value: str | int | float | bool,
         unit: str,
-        log_alerts: bool = True
+        log_alerts: bool = True,
     ) -> None:
 
         table = self.query_one("#sensor_table", DataTable)
@@ -308,12 +291,9 @@ class ControlPanelApp(App):
             row_key = table.add_row(*row_values)
             self._sensor_rows[key] = row_key
 
-    def update_actuator(self,
-                        node_id: str,
-                        actuator_id: str,
-                        state: str,
-                        actuator_type: str | None = None
-                        ) -> None:
+    def update_actuator(
+        self, node_id: str, actuator_id: str, state: str, actuator_type: str | None = None
+    ) -> None:
         table = self.query_one("#actuator_table", DataTable)
         timestamp = datetime.now().strftime("%H:%M:%S")
         key = (node_id, actuator_id)
@@ -332,11 +312,7 @@ class ControlPanelApp(App):
             table.update_cell(row_key, col_keys[4], timestamp)
         else:
             row_key = table.add_row(
-                node_id,
-                actuator_id,
-                actuator_type or "unknown",
-                state_text,
-                timestamp
+                node_id, actuator_id, actuator_type or "unknown", state_text, timestamp
             )
             self._actuator_rows[key] = row_key
 
@@ -377,4 +353,3 @@ class ControlPanelApp(App):
             log.write(
                 f"[bold red]Command failed[/bold red]: {node_id}.{actuator_id} remains {state}"
             )
-

@@ -27,8 +27,7 @@ def create_node(
         node_id=node_id,
         sensors=[create_sensor(sensor_type, sensor_id) for sensor_type, sensor_id in sensors],
         actuators=[
-            create_actuator(actuator_type, actuator_id)
-            for actuator_type, actuator_id in actuators
+            create_actuator(actuator_type, actuator_id) for actuator_type, actuator_id in actuators
         ],
         host=host,
         port=port,
@@ -47,7 +46,6 @@ async def start_node(node: SensorActuatorNode) -> None:
         logging.info(f"Node '{node.node_id}' shutting down...")
     finally:
         await node.disconnect()
-
 
 
 def _parse_component_spec(spec: str, component: str) -> tuple[str, str]:
@@ -71,7 +69,8 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
         default=[],
         metavar="TYPE:ID",
         help="Add a sensor, for example temperature:temp_1. Available types: "
-             + sensor_types + ". Repeatable.",
+        + sensor_types
+        + ". Repeatable.",
     )
     parser.add_argument(
         "--actuator",
@@ -92,12 +91,8 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
         parser.error("at least one --sensor or --actuator is required")
 
     try:
-        parsed.sensors = [
-            _parse_component_spec(spec, "Sensor") for spec in parsed.sensor
-        ]
-        parsed.actuators = [
-            _parse_component_spec(spec, "Actuator") for spec in parsed.actuator
-        ]
+        parsed.sensors = [_parse_component_spec(spec, "Sensor") for spec in parsed.sensor]
+        parsed.actuators = [_parse_component_spec(spec, "Actuator") for spec in parsed.actuator]
     except ValueError as error:
         parser.error(str(error))
 

@@ -73,12 +73,9 @@ class ControlPanelClient:
         await self.writer.drain()
         logging.info("Control panel '%s' registered with role %s", self.client_id, self.role)
 
-    async def send_actuator_command(self,
-                                    target_node_id: str,
-                                    actuator_id: str,
-                                    command: str,
-                                    value: int | float | None = None
-                                    ) -> None:
+    async def send_actuator_command(
+        self, target_node_id: str, actuator_id: str, command: str, value: int | float | None = None
+    ) -> None:
         """
         Send an actuator command to the server
 
@@ -96,7 +93,7 @@ class ControlPanelClient:
             "target_node_id": target_node_id,
             "actuator_id": actuator_id,
             "command": command,
-            "value": value
+            "value": value,
         }
         self.writer.write(encode_message(message))
         await self.writer.drain()
@@ -105,13 +102,12 @@ class ControlPanelClient:
             self.client_id,
             command,
             target_node_id,
-            actuator_id
+            actuator_id,
         )
 
     def _update_state(self, message: dict) -> None:
 
         match message["type"]:
-
             case MessageType.SYSTEM_STATE:
                 self.state_cache = deepcopy(message)
 
@@ -135,8 +131,6 @@ class ControlPanelClient:
                         if actuator.get("id") == message["actuator_id"]:
                             actuator["state"] = message["state"]
                             return
-
-
 
     async def read_loop(self) -> bool:
         """Read and process server messages until the connection closes."""
@@ -191,7 +185,7 @@ class ControlPanelClient:
                 try:
                     await self.register()
                     if await self.read_loop():
-                        attempts = 0 # reset number of connection attempts
+                        attempts = 0  # reset number of connection attempts
                 except OSError as error:
                     logging.warning("Connection error: %s", error)
 

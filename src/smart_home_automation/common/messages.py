@@ -12,6 +12,7 @@ def _validate_safe_value(field_name: str, value: object) -> None:
             f"Invalid characters in field {field_name}",
         )
 
+
 MESSAGE_SCHEMAS = {
     MessageType.REGISTER_NODE: {
         "node_id": str,
