@@ -1,5 +1,6 @@
 import pytest
 
+from smart_home_automation.common.constants import MAX_MESSAGE_SIZE, MessageType
 from smart_home_automation.common.framing import decode_message, encode_message
 from smart_home_automation.common.messages import ProtocolError
 
@@ -27,3 +28,17 @@ class TestFraming:
         # Check that decode raises a ProtocolError when the input is not valid JSON.
         with pytest.raises(ProtocolError):
             decode_message(b"not valid json\n")
+
+    def test_encode_rejects_messages_over_64_kib(self):
+        message = {
+            "type": MessageType.ERROR,
+            "code": "ERR_INVALID_SCHEMA",
+            "message": "x" * MAX_MESSAGE_SIZE,
+        }
+
+        with pytest.raises(ProtocolError, match="64KiB"):
+            encode_message(message)
+
+    def test_decode_rejects_messages_over_64_kib(self):
+        with pytest.raises(ProtocolError, match="64KiB"):
+            decode_message(b"x" * (MAX_MESSAGE_SIZE + 1))

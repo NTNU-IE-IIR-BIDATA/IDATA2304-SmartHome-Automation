@@ -4,8 +4,11 @@ from unittest.mock import patch
 
 from textual.widgets import DataTable
 
+from smart_home_automation.common.constants import ErrorCode, MessageType
+from smart_home_automation.common.framing import decode_message, encode_message
 from smart_home_automation.control_panel.client import ControlPanelClient
 from smart_home_automation.control_panel.ui import ControlPanelApp
+from smart_home_automation.node.actuators import FanActuator
 from smart_home_automation.node.node import SensorActuatorNode
 from smart_home_automation.node.sensors import TemperatureSensor
 from smart_home_automation.server.server import Server
@@ -74,7 +77,10 @@ class TestEndToEnd(unittest.IsolatedAsyncioTestCase):
                     with patch.object(sensor, "read_value", return_value=value):
                         await node.send_sensor_data()
 
-                    await wait_until(lambda: table.get_row_at(0)[3] == str(value))
+                    expected_value = str(value)
+                    await wait_until(
+                        lambda expected=expected_value: table.get_row_at(0)[3] == expected
+                    )
                     self.assertEqual(table.row_count, 1)
                     self.assertEqual(
                         client.state["nodes"][0]["sensors"][0]["value"],
@@ -94,6 +100,87 @@ class TestEndToEnd(unittest.IsolatedAsyncioTestCase):
             listener.close()
             await listener.wait_closed()
 
+            if handlers:
+                await asyncio.wait_for(
+                    asyncio.gather(*list(handlers)),
+                    timeout=5,
+                )
+
+    async def test_command_auth_round_trip_and_node_reconnect(self):
+        server = Server()
+        handlers = set()
+
+        async def handle_connection(reader, writer):
+            task = asyncio.current_task()
+            handlers.add(task)
+            try:
+                await server.handle_client(reader, writer)
+            finally:
+                handlers.discard(task)
+
+        listener = await asyncio.start_server(handle_connection, "127.0.0.1", 0)
+        port = listener.sockets[0].getsockname()[1]
+        first_fan = FanActuator("fan_1")
+        second_fan = FanActuator("fan_1")
+        node = SensorActuatorNode("test_room", actuators=[first_fan], port=port)
+        second_node = SensorActuatorNode("second_room", actuators=[second_fan], port=port)
+        updates = asyncio.Queue()
+        client = ControlPanelClient("test_panel", "OWNER", port=port, on_update=updates.put_nowait)
+        node_task = asyncio.create_task(node.run())
+        second_node_task = asyncio.create_task(second_node.run())
+        panel_task = asyncio.create_task(client.run())
+
+        try:
+            await wait_until(lambda: server.state.get_connection("test_room") is not None)
+            await wait_until(lambda: server.state.get_connection("second_room") is not None)
+
+            while not updates.empty():
+                updates.get_nowait()
+
+            await client.send_actuator_command("ALL", "fan_1", "ON")
+            confirmations = []
+            while len(confirmations) < 2:
+                update = await updates.get()
+                if update["type"] == MessageType.ACTUATOR_STATE:
+                    confirmations.append(update)
+            self.assertEqual(
+                {confirmation["node_id"] for confirmation in confirmations},
+                {"test_room", "second_room"},
+            )
+            self.assertTrue(all(confirmation["success"] for confirmation in confirmations))
+            self.assertEqual(first_fan.state.value, "ON")
+            self.assertEqual(second_fan.state.value, "ON")
+
+            unauthorized_reader, unauthorized_writer = await asyncio.open_connection(
+                "127.0.0.1", port
+            )
+            unauthorized_writer.write(
+                encode_message(
+                    {
+                        "type": MessageType.ACTUATOR_CMD,
+                        "target_node_id": "test_room",
+                        "actuator_id": "fan_1",
+                        "command": "OFF",
+                        "value": None,
+                    }
+                )
+            )
+            await unauthorized_writer.drain()
+            error = decode_message(await unauthorized_reader.readline())
+            self.assertEqual(error["code"], ErrorCode.AUTH_FAILED)
+            unauthorized_writer.close()
+            await unauthorized_writer.wait_closed()
+
+            await node.disconnect()
+            await wait_until(lambda: server.state.get_connection("test_room") is None)
+            await wait_until(lambda: server.state.get_connection("test_room") is not None)
+        finally:
+            node.stop()
+            second_node.stop()
+            client.stop()
+            await asyncio.gather(node_task, second_node_task, panel_task, return_exceptions=True)
+            listener.close()
+            await listener.wait_closed()
             if handlers:
                 await asyncio.wait_for(
                     asyncio.gather(*list(handlers)),

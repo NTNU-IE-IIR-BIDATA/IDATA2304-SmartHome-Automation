@@ -90,6 +90,7 @@ def test_run_stops_telemetry_on_disconnect():
 
         async def fake_readline():
             await started.wait()
+            node.stop()
             return b""
 
         node.register = AsyncMock()

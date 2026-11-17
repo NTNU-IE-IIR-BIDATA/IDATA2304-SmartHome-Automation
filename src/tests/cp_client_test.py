@@ -145,8 +145,10 @@ async def _test_control_panel_read_loop_updates_cache():
         server.close()
         await server.wait_closed()
 
+
 def test_control_panel_sends_actuator_command_over_tcp():
     asyncio.run(_test_control_panel_sends_actuator_command_over_tcp())
+
 
 async def _test_control_panel_sends_actuator_command_over_tcp():
     received = []
@@ -178,8 +180,10 @@ async def _test_control_panel_sends_actuator_command_over_tcp():
         "value": None,
     }
 
+
 def test_send_actuator_command_requires_connection():
     asyncio.run(_test_send_actuator_command_requires_connection())
+
 
 async def _test_send_actuator_command_requires_connection():
     client = ControlPanelClient("panel_01", "OWNER")
@@ -187,8 +191,10 @@ async def _test_send_actuator_command_requires_connection():
     with pytest.raises(RuntimeError, match="not connected"):
         await client.send_actuator_command("living_room_01", "fan_01", "ON")
 
+
 def test_control_panel_merges_actuator_state():
     asyncio.run(_test_control_panel_merges_actuator_state())
+
 
 async def _test_control_panel_merges_actuator_state():
 

@@ -22,13 +22,20 @@ class ControlPanelApp(App):
         height: 1fr;
     }
     #sensors_panel {
-        width: 3fr;
+        width: 4fr;
         height: 1fr;
         padding-right: 1;
+        padding-left: 1;
     }
     #actuator_panel {
+        width: 3fr;
+        height: 1fr;
+        padding-right:1;
+    }
+    #node_panel {
         width: 2fr;
         height: 1fr;
+        padding-right: 1;
     }
     #alerts_panel {
         height: 10;
@@ -52,16 +59,20 @@ class ControlPanelApp(App):
         self.detector = AnomalyDetector()
         self._sensor_rows = {}
         self._actuator_rows = {}
+        self._node_connected: dict[str, bool] = {}
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Horizontal(id="tables_container"):
             with Vertical(id="sensors_panel"):
                 yield Static("Sensors", classes="section_title")
-                yield DataTable(id="sensor_table")
+                yield DataTable(id="sensor_table", cursor_foreground_priority="renderable")
             with Vertical(id="actuator_panel"):
                 yield Static("Actuators", classes="section_title")
-                yield DataTable(id="actuator_table")
+                yield DataTable(id="actuator_table", cursor_foreground_priority="renderable")
+            with Vertical(id="node_panel"):
+                yield Static("Nodes", classes="section_title")
+                yield DataTable(id="node_table", cursor_foreground_priority="renderable")
 
         with Vertical(id="alerts_panel"):
             yield Static("Anomaly Feed")
@@ -69,11 +80,12 @@ class ControlPanelApp(App):
 
         yield Input(
             placeholder="Command: <node_id> <actuator_id> <ON|OFF|OPEN|CLOSED> [value]",
-            id = "cmd_input"
+            id="cmd_input",
         )
         yield Footer()
 
     def on_mount(self) -> None:
+
         table = self.query_one("#sensor_table", DataTable)
         table.cursor_type = "row"
         table.add_columns("Node", "Sensor", "Type", "Value", "Unit", "Status", "Updated")
@@ -82,9 +94,18 @@ class ControlPanelApp(App):
         actuator_table.cursor_type = "row"
         actuator_table.add_columns("Node", "Actuator", "Type", "State", "Updated")
 
+        node_table = self.query_one("#node_table", DataTable)
+        node_table.cursor_type = "row"
+        node_table.add_columns("Node", "Status")
+
         if self.client is not None:
+            self.sub_title = f"{self.client.client_id} {self.client.role}"
             self.client.on_update = self.handle_server_update
             self.run_worker(self._run_client(), name="panel-client")
+
+    def on_unmount(self) -> None:
+        if self.client is not None:
+            self.client.stop()
 
     async def _run_client(self) -> None:
         if self.client is None:
@@ -95,7 +116,9 @@ class ControlPanelApp(App):
         try:
             await self.client.run()
         except OSError as error:
-            log.write(f"Connection error: {error}")
+            self.query_one("#alert_log", RichLog).write(
+                f"[bold red]Connection error: {error}[/bold red]"
+            )
         else:
             log.write("Connection to server closed")
 
@@ -118,9 +141,7 @@ class ControlPanelApp(App):
             parts = parts[1:]
 
         if len(parts) not in (3, 4):
-            log.write(
-                "[yellow]Usage: <node_id> <actuator_id> <command> [value][/yellow]"
-            )
+            log.write("[yellow]Usage: <node_id|ALL> <actuator_id|ALL> <command> [value][/yellow]")
             return
 
         target_node_id, target_actuator_id, command = parts[0], parts[1], parts[2].upper()
@@ -141,32 +162,25 @@ class ControlPanelApp(App):
         except (OSError, RuntimeError) as error:
             log.write(f"[bold red]Failed to send command: {error}[/bold red]")
 
-
-
-
-
     def action_clear_alerts(self) -> None:
         self.query_one("#alert_log", RichLog).clear()
 
     def handle_server_update(self, message: dict) -> None:
 
         match message["type"]:
-
             case MessageType.SYSTEM_STATE:
                 self.load_system_state(message)
 
             case MessageType.ERROR:
-                self.query_one("#alert_log", RichLog).write(f"Server error: {message['message']}")
+                self.query_one("#alert_log", RichLog).write(
+                    f"[bold red]ERROR: ({message['code']}): {message['message']}[/bold red]"
+                )
 
             case MessageType.ACTUATOR_STATE:
                 self._handle_actuator_state_update(message)
 
-
             case MessageType.SENSOR_DATA:
                 self._handle_sensor_data(message)
-
-
-
 
     def load_system_state(self, state: dict) -> None:
         table = self.query_one("#sensor_table", DataTable)
@@ -177,8 +191,28 @@ class ControlPanelApp(App):
         actuator_table.clear()
         self._actuator_rows.clear()
 
+        node_table = self.query_one("#node_table", DataTable)
+        node_table.clear()
+
+        log = self.query_one("#alert_log", RichLog)
+
         for node in state.get("nodes", []):
             node_id = node["node_id"]
+            connected = node.get("connected", True)
+            was_connected = self._node_connected.get(node_id)
+
+            if was_connected is None and not connected:
+                log.write(f"[red]Node {node_id} is offline[/red]")
+            elif was_connected is True and not connected:
+                log.write(f"[red]Node {node_id} not connected[/red]")
+            elif was_connected is False and connected:
+                log.write(f"[green]Node {node_id} reconnected[/green]")
+
+            status = "[green]Connected[/green]" if connected else "[red]Not Connected[/red]"
+
+            self._node_connected[node_id] = connected
+
+            node_table.add_row(node_id, status)
 
             for sensor in node.get("sensors", []):
                 sensor_id = sensor["id"]
@@ -187,11 +221,7 @@ class ControlPanelApp(App):
 
                 if sensor.get("value") is not None:
                     self.update_sensor(
-                        node_id,
-                        sensor_id,
-                        sensor_type,
-                        sensor["value"],
-                        unit,
+                        node_id, sensor_id, sensor_type, sensor["value"], unit, log_alerts=False
                     )
                 else:
                     row_key = table.add_row(
@@ -210,7 +240,7 @@ class ControlPanelApp(App):
                     node_id,
                     actuator["id"],
                     actuator.get("state", "-"),
-                    actuator.get("type", "unknown")
+                    actuator.get("type", "unknown"),
                 )
 
     def update_sensor(
@@ -220,6 +250,7 @@ class ControlPanelApp(App):
         sensor_type: SensorType,
         value: str | int | float | bool,
         unit: str,
+        log_alerts: bool = True,
     ) -> None:
 
         table = self.query_one("#sensor_table", DataTable)
@@ -230,10 +261,12 @@ class ControlPanelApp(App):
         if anomaly:
             if anomaly.severity == AnomalySeverity.CRITICAL:  # critical anomaly
                 status_text = "[bold red]CRITICAL[/bold red]"
-                log.write(f"[bold red]CRITICAL ALERT[/bold red]: {anomaly.message}")
+                if log_alerts:
+                    log.write(f"[bold red]CRITICAL ALERT[/bold red]: {anomaly.message}")
             else:  # warning anomaly
                 status_text = "[yellow]WARNING[/yellow]"
-                log.write(f"[yellow]Warning[/yellow]: {anomaly.message}")
+                if log_alerts:
+                    log.write(f"[yellow]Warning[/yellow]: {anomaly.message}")
         else:
             status_text = "[green]OK[/green]"
 
@@ -258,12 +291,9 @@ class ControlPanelApp(App):
             row_key = table.add_row(*row_values)
             self._sensor_rows[key] = row_key
 
-    def update_actuator(self,
-                        node_id: str,
-                        actuator_id: str,
-                        state: str,
-                        actuator_type: str | None = None
-                        ) -> None:
+    def update_actuator(
+        self, node_id: str, actuator_id: str, state: str, actuator_type: str | None = None
+    ) -> None:
         table = self.query_one("#actuator_table", DataTable)
         timestamp = datetime.now().strftime("%H:%M:%S")
         key = (node_id, actuator_id)
@@ -282,11 +312,7 @@ class ControlPanelApp(App):
             table.update_cell(row_key, col_keys[4], timestamp)
         else:
             row_key = table.add_row(
-                node_id,
-                actuator_id,
-                actuator_type or "unknown",
-                state_text,
-                timestamp
+                node_id, actuator_id, actuator_type or "unknown", state_text, timestamp
             )
             self._actuator_rows[key] = row_key
 
@@ -327,4 +353,3 @@ class ControlPanelApp(App):
             log.write(
                 f"[bold red]Command failed[/bold red]: {node_id}.{actuator_id} remains {state}"
             )
-

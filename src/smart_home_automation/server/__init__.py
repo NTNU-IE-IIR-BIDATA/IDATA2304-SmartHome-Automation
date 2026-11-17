@@ -1,11 +1,31 @@
+import argparse
 import asyncio
 import logging
+from typing import Sequence
+
+from smart_home_automation.common.constants import DEFAULT_HOST, DEFAULT_PORT
 
 from .server import Server
 
 
-async def run_server():
-    server = Server()
+def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Start a Smart Home Server")
+    parser.add_argument(
+        "--host", default=DEFAULT_HOST, help=f"Host address for server. Default: {DEFAULT_HOST}"
+    )
+    parser.add_argument(
+        "--port",
+        default=DEFAULT_PORT,
+        type=int,
+        help=f"Port to use for the server. Default: {DEFAULT_PORT}",
+    )
+    return parser.parse_args(arguments)
+
+
+async def run_server(server: Server | None = None) -> None:
+    if server is None:
+        server = Server()
+
     try:
         await server.start()
     except (asyncio.CancelledError, KeyboardInterrupt):
@@ -14,13 +34,17 @@ async def run_server():
         await server.stop()
 
 
-def main():
+def main(arguments: Sequence[str] | None = None) -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
+    parsed = _parse_arguments(arguments)
+
+    server = Server(host=parsed.host, port=parsed.port)
+
     try:
-        asyncio.run(run_server())
+        asyncio.run(run_server(server))
     except KeyboardInterrupt:
         # Loop has closed cleanly
         logging.info("Server shutdown complete.")

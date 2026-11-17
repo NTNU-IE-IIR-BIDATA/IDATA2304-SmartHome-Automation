@@ -120,6 +120,20 @@ class TestControlPanelUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(table.get_row_at(0)[:3], ["living_room_01", "fan_1", "fan"])
             self.assertIn("ON", table.get_row_at(0)[3])
 
+    async def test_node_table_display_connected(self):
+        app = ControlPanelApp()
+
+        async with app.run_test():
+            app.handle_server_update(self.snapshot)
+            table = app.query_one("#node_table", DataTable)
+            self.assertEqual(table.row_count, 1)
+            self.assertEqual(table.get_row_at(0), ["living_room_01", "[green]Connected[/green]"])
+
+            self.snapshot["nodes"][0]["connected"] = False
+            app.handle_server_update(self.snapshot)
+            self.assertEqual(table.row_count, 1)
+            self.assertEqual(table.get_row_at(0), ["living_room_01", "[red]Not Connected[/red]"])
+
     async def test_command_input_sends_actuator_command(self):
         app = ControlPanelApp()
         mock_client = MagicMock(spec=ControlPanelClient)

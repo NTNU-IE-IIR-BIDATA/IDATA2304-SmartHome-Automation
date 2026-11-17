@@ -5,3 +5,5 @@ __pycache__/
 *.py[cod]
 .gemini/
 skills/
+.DS_Store
+src/.DS_Store

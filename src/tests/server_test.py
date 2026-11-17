@@ -71,6 +71,34 @@ class TestServerUnit:
         assert sent_data["code"] == ErrorCode.MALFORMED_JSON
 
     @async_test
+    async def test_read_loop_closes_after_repeated_protocol_errors(self):
+        server = Server()
+        mock_reader = MagicMock()
+        mock_reader.readline = AsyncMock(
+            side_effect=[b"not valid json\n", b"not valid json\n", b"not valid json\n"]
+        )
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+
+        await server._read_loop(mock_reader, mock_writer, ("127.0.0.1", 12345))
+
+        assert mock_writer.write.call_count == 3
+        assert mock_reader.readline.await_count == 3
+
+    @async_test
+    async def test_read_loop_rejects_oversized_line(self):
+        server = Server()
+        mock_reader = MagicMock()
+        mock_reader.readline = AsyncMock(side_effect=asyncio.LimitOverrunError("too long", 0))
+        mock_writer = MagicMock()
+        mock_writer.drain = AsyncMock()
+
+        await server._read_loop(mock_reader, mock_writer, ("127.0.0.1", 12345))
+
+        response = decode_message(mock_writer.write.call_args.args[0])
+        assert response["code"] == ErrorCode.MALFORMED_JSON
+
+    @async_test
     async def test_dispatch_routes_to_register_node(self):
         """Verify _dispatch_message routes REGISTER_NODE correctly."""
         server = Server()

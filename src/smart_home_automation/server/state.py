@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from ..common.constants import ErrorCode, MessageType
+from ..common.constants import ErrorCode, MessageType, Role
 from ..common.messages import ProtocolError
 
 
@@ -11,6 +11,13 @@ class ServerState:
         self._panels = {}
 
     def register_panel(self, client_id, role, connection):
+        try:
+            role = Role(role)
+        except (ValueError, TypeError):
+            raise ProtocolError(
+                ErrorCode.AUTH_FAILED,
+                f"Unknown panel role: {role}",
+            ) from None
         if not isinstance(client_id, str) or not client_id.strip():
             raise ProtocolError(ErrorCode.INVALID_SCHEMA, "Invalid client_id")
 
@@ -22,6 +29,12 @@ class ServerState:
         ):
             raise ProtocolError(ErrorCode.INVALID_SCHEMA, "Connection is already registered")
         self._panels[client_id] = {"role": role, "connection": connection}
+
+    def get_panel_role(self, connection):
+        for panel in self._panels.values():
+            if panel["connection"] is connection:
+                return panel["role"]
+        return None
 
     def get_panel_connections(self):
         return [panel["connection"] for panel in self._panels.values()]
@@ -136,9 +149,7 @@ class ServerState:
 
         return None
 
-    def update_actuator_state(
-            self, node_id, actuator_id, state, connection=None
-    ):
+    def update_actuator_state(self, node_id, actuator_id, state, connection=None):
         if node_id not in self._nodes:
             raise ProtocolError(
                 ErrorCode.NODE_NOT_FOUND,
