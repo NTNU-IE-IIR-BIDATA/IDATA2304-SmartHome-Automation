@@ -35,6 +35,7 @@ class ControlPanelClient:
         self.state_cache: dict = {"type": MessageType.SYSTEM_STATE, "nodes": []}
         self.last_error: dict | None = None
         self._running = False
+        self._stopped = False
 
     @property
     def is_connected(self) -> bool:
@@ -137,18 +138,19 @@ class ControlPanelClient:
 
 
 
-    async def read_loop(self) -> None:
+    async def read_loop(self) -> bool:
         """Read and process server messages until the connection closes."""
         if self.reader is None:
             raise RuntimeError(f"Control panel '{self.client_id}' is not connected")
 
         self._running = True
+        recieved_message = False
         while self._running and self.is_connected:
             line = await self.reader.readline()
             if not line:
                 logging.info("Server closed the control-panel connection")
                 break
-
+            recieved_message = True
             try:
                 message = decode_message(line)
             except ProtocolError as error:
@@ -164,6 +166,7 @@ class ControlPanelClient:
                 self.on_update(deepcopy(message))
 
         self._running = False
+        return recieved_message
 
     async def disconnect(self) -> None:
         """Close the TCP connection cleanly."""
@@ -179,17 +182,40 @@ class ControlPanelClient:
             self.reader = None
             logging.info("Control panel '%s' disconnected", self.client_id)
 
-    async def run(self) -> None:
+    async def run(self, reconnect_delay: float = 10.0) -> None:
         """Register the panel and process server updates until disconnected."""
+        self._stopped = False
+        attempts = 0
         try:
-            await self.register()
-            await self.read_loop()
+            while not self._stopped:
+                try:
+                    await self.register()
+                    if await self.read_loop():
+                        attempts = 0 # reset number of connection attempts
+                except OSError as error:
+                    logging.warning("Connection error: %s", error)
+
+                if self._stopped:
+                    break
+
+                attempts += 1
+
+                if attempts > 3:
+                    raise ConnectionError("Failed to connect after 4 attempts")
+
+                if self.writer is not None:
+                    self.writer.close()
+                    self.writer = None
+                    self.reader = None
+
+                await asyncio.sleep(reconnect_delay)
         finally:
             await self.disconnect()
 
     def stop(self) -> None:
         """Signal the read loop to stop."""
         self._running = False
+        self._stopped = True
         if self.writer is not None:
             self.writer.close()
 
