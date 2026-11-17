@@ -2,7 +2,7 @@ import argparse
 import logging
 from typing import Sequence
 
-from smart_home_automation.common.constants import DEFAULT_HOST, DEFAULT_PORT
+from smart_home_automation.common.constants import DEFAULT_HOST, DEFAULT_PORT, Role
 
 from .client import ControlPanelClient
 from .ui import ControlPanelApp
@@ -46,14 +46,20 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
     )
     parser.add_argument(
         "--role",
+        type=str.upper,
+        choices= [role.value for role in Role],
+        default=Role.OWNER.value,
         help="Role to assign the control panel. Default: 'OWNER'"
     )
     parser.add_argument(
         "--host",
+        default=DEFAULT_HOST,
         help=f"Host address of the server to connect to. Default: {DEFAULT_HOST}"
     )
     parser.add_argument(
         "--port",
+        type=int,
+        default=DEFAULT_PORT,
         help=f"Server port to connect to. Default: {DEFAULT_PORT}"
     )
     return parser.parse_args(arguments)
