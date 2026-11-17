@@ -10,7 +10,7 @@ The system has three parts:
 2. **Sensor-actuator node** - registers sensors and actuators, sends sensor readings every 5 seconds, and runs actuator commands from the server.
 3. **Control panel** - terminal UI showing connected nodes, live sensor readings, anomaly warnings, and an input bar for actuator commands.
 
-Nodes and control panels talk to the server using the Smart Home Automation Protocol (SHAP), which sends newline-delimited JSON messages over TCP. The default address is `127.0.0.1:5555`. See [protocol.md](protocol.md) for the full specification.
+Nodes and control panels talk to the server using the Smart Home Automation Protocol (SHAP), which sends newline-delimited JSON messages over TCP. The default address is `127.0.0.1:5555`, and the server also listens on UDP port `5556` for automatic discovery. See [protocol.md](protocol.md) for the full specification.
 
 ### How messages flow
 
@@ -76,7 +76,7 @@ uv run server --cert-file tls/demo/server.crt --key-file tls/demo/server.key \
   [--host HOST] [--port PORT]
 ```
 
-The server defaults to host `127.0.0.1` on port `5555`. But you can use others host and port to:
+The server defaults to host `127.0.0.1` on port `5555`, and also listens on UDP port `5556` for server discovery. But you can use another host and port (use `0.0.0.0` if clients on other machines should connect or discover it):
 
 ```bash
 uv run server --host 0.0.0.0 --port 5555 \
@@ -92,10 +92,11 @@ uv run node --id NODE_ID \
   --ca-file tls/demo/ca.crt \
   --sensor TYPE:ID \
   --actuator TYPE:ID \
-  [--host HOST] [--port PORT]
+  [--host HOST] [--port PORT] [--discover]
 ```
 
 `--host` (or `--ip`) and `--port` default to `127.0.0.1` and `5555`.
+`--discover` finds the server automatically over UDP (port `5556`) instead of using `--host` and `--port`, exiting if no server responds within 3 seconds.
 `--ca-file` verifies the server certificate and is required for the documented
 TLS startup.
 
@@ -109,10 +110,11 @@ Run `uv run node --help` to see all options.
 
 ```bash
 uv run control_panel [--id PANEL_ID] [--role ROLE] [--host HOST] [--port PORT] \
-  --ca-file tls/demo/ca.crt
+  [--discover] --ca-file tls/demo/ca.crt
 ```
 
 By default, it connects to `127.0.0.1:5555` as `panel_1` with role `OWNER`.
+`--discover` finds the server automatically over UDP (port `5556`) instead of using `--host` and `--port`, exiting if no server responds within 3 seconds.
 `--ca-file` verifies the server certificate and is required for the documented
 TLS startup.
 
@@ -164,7 +166,7 @@ uv run ruff check
 ```text
 src/
 ├── smart_home_automation/
-│   ├── common/                 Shared constants, framing, and message validation
+│   ├── common/                 Shared constants, framing, discovery, TLS, and message validation
 │   ├── server/                 TCP server and system state
 │   ├── node/                   Simulated sensors, actuators, and node client
 │   └── control_panel/          Control-panel client, anomaly detector, and Textual UI

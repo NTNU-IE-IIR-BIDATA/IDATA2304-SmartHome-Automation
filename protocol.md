@@ -16,28 +16,28 @@ and a central server in a smart home environment.
 
 ## 3. Underlying Transport Protocol
 
-SHAP exclusively uses the Transmission Control Protocol (TCP).
+SHAP uses the Transmission Control Protocol (TCP) for all session communication, and User Datagram Protocol (UDP) only for optional server discovery.
 
 *Justification*: Actuator commands, such as door locking, fire alarm or heater adjustments require
-reliability and sequential delivery. TCP eliminates the need to reimplement packet order, error detection and retransmission in the application layer, reducing the protocols complexity compared to UDP.
+reliability and sequential delivery. TCP eliminates the need to reimplement packet order, error detection and retransmission in the application layer, reducing the protocols complexity compared to UDP. UDP is only used before connecting so clients can broadcast a discovery request on the local network without knowing the server's IP address beforehand.
 
 ## 4. Port Number
 
-Standard listening port for the SHAP server is ```5555/TCP```
+Standard listening ports for the SHAP server are ```5555/TCP``` for client sessions and ```5556/UDP``` for server discovery.
 
-*Justification*: Port `5555` lies within the dynamic/private port range, avoiding conflict with standardized privileged ports below 1024. The port may be overridden by configuration parameters during boot.
+*Justification*: Ports `5555` and `5556` lie within the dynamic/private port range, avoiding conflict with standardized privileged ports below 1024. The TCP port may be overridden by configuration parameters during boot, in which case discovery returns the active TCP port.
 
 
 ## 5. Overall architecture
 
 ### Actors
 
-- ```Server```: Central hub. Handles TCP sessions, identification and role based authorization of control panels, message verification, storing the last known state of all nodes, and routing messages between nodes.
+- ```Server```: Central hub. Handles TCP sessions, optional UDP discovery replies, identification and role based authorization of control panels, message verification, storing the last known state of all nodes, and routing messages between nodes.
 - ```Sensor nodes (SAN)```: Clients who initiates outgoing connections to the server, registers their units, send sensor data and listens for actuator commands.
 - ```Control panels (CP)```: Clients who connects to the server, receiving real-time updates and sends commands based on access level
 
 ### Connection direction
-All TCP connections are initiated from the clients (SAN and CP) against the server. There is no direct node-to-node communication.
+All TCP connections are initiated from the clients (SAN and CP) against the server. There is no direct node-to-node communication. If discovery is enabled on the client, it first sends a UDP probe to locate the server before opening the TCP connection.
 
 *Justification*: Direct communication between nodes would require the nodes to serve multiple functionalities. Separating the nodes and sensors from the server simplifies synchronization and handling of multiple clients.
 
@@ -45,6 +45,7 @@ All TCP connections are initiated from the clients (SAN and CP) against the serv
 
 The protocol relies on an asynchronous, event-driven push-model:
 
+- **Discovery (optional, Client → Server → Client):** Before connecting over TCP, a client can send `DISCOVER_SERVER` over UDP to port `5556` (broadcast and `127.0.0.1`) and wait up to 3 seconds for a `SERVER_OFFER` reply containing the server's TCP port.
 - **Registration:** Immediately after the TCP-connection is established, the clients send an instruction message (```REGISTER_NODE```or ```REGISTER_PANEL```)
 - **Telemetry and state changes (SAN → Server):** Sensor nodes push data based on set intervals (for slow data such as temperature), or immediately for threshold/state-changes (movement, smoke). The node does not wait for explicit requests from the server
 - **Broadcast (Server → CP):** When the server receives new data or state changes from a sensor node, the values are cached, and the message forwarded immediately to all connected control panels with access
@@ -56,7 +57,7 @@ A push based system minimizes bandwidth usage, and ensures an immediate response
 
 ## 7. Protocol type
 
-**Connection oriented:** The protocol operates exclusively over persistent TCP-Streams. Breaks in the TCP-Session is regarded as disconnection of the node.
+**Connection oriented:** Session communication operates over persistent TCP-Streams. Breaks in the TCP-Session is regarded as disconnection of the node. (Only optional server discovery uses connectionless UDP datagrams.)
 
 **Statefulness**: Stateful. The server actively maintains a state for each session: client type, client ID, authorization level for panels, and a list over related sensors and actuators. Clients need to register before other messages are accepted.
 
@@ -111,6 +112,7 @@ being forwarded to a node.
 ### Framing
 
 The protocol uses Line-Delimited JSON (NDJSON) encoded in UTF-8. Every message is formatted on exactly one line, ended by line-shift (`\n`).
+Discovery messages (`DISCOVER_SERVER` and `SERVER_OFFER`) are sent as single UTF-8 JSON objects in individual UDP datagrams and do not require a trailing `\n`.
 
 *Justification*: JSON gives a structural flexibility and makes the protocol independent of any programming language, as well as making it easily expandable for new sensor types. 
 Limiting with `\n` removes the need for a separate binary length header, allowing parsing via standard I/O functions.
@@ -120,6 +122,31 @@ Limiting with `\n` removes the need for a separate binary length header, allowin
 All messages must contain the `type` field.
 
 ### Message catalog
+
+#### Server discovery request: `DISCOVER_SERVER`
+
+**Direction**: Client (SAN or CP) → Server (UDP)
+
+**Description**: Sent over UDP to `255.255.255.255:5556` and `127.0.0.1:5556` when a client uses automatic server discovery
+
+```JSON
+{
+  "type": "DISCOVER_SERVER"
+}
+```
+
+#### Server discovery response: `SERVER_OFFER`
+
+**Direction**: Server → Client (UDP)
+
+**Description**: Sent back over UDP to the probing client with the server's active TCP port. The client gets the server's IP address from the UDP source address.
+
+```JSON
+{
+  "type": "SERVER_OFFER",
+  "port": 5555
+}
+```
 
 #### Sensor node registration: `REGISTER_NODE`
 
@@ -276,6 +303,7 @@ control panels.
 - **Unreachable target node**: If a panel sends `ACTUATOR_CMD` to a node which is not registered or recently disconnected, the server returns `ERR_NODE_NOT_FOUND` to the panel.
 - **Unauthorized operation**: If a control panel with the role `GUEST` tries to perform an action reserved for `OWNER`, the server rejects the request with `ERR_AUTH_FAILED` without forwarding it to the sensor node
 - **Repeated protocol violations**: After three consecutive malformed or invalid messages, the server sends the final error response and closes the TCP session.
+- **Discovery errors and timeout**: Malformed or unexpected UDP discovery packets are silently ignored. If a client receives no valid `SERVER_OFFER` within 3 seconds, discovery times out and the client exits.
 
 The server sends errors to clients when a request cannot be processed.
 
@@ -324,7 +352,7 @@ If a sensor node loses connection, the server marks the node `connected: false` 
 
 ## 14. Assumptions
 
-**Network environment**: The server has a known or static IP-address and listens to port `5555`. The clients know this address on startup.
+**Network environment**: The server listens on port `5555/TCP` (or a configured port) and `5556/UDP` for discovery. Clients either know the server's address on startup or use UDP discovery on the local network to find it.
 
 **Unique ID's**: Every sensor node is configured with a unique ID string on startup. The server rejects connection requests if a node attempts to register with an already active `node_id`.
 
