@@ -10,6 +10,7 @@ from smart_home_automation.node.actuators import FanActuator
 from smart_home_automation.node.node import SensorActuatorNode
 from smart_home_automation.server.server import Server
 
+
 def writer_mock():
     writer = MagicMock()
     writer.drain = AsyncMock()
