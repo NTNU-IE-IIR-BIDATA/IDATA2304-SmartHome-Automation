@@ -172,6 +172,7 @@ async def _test_node_executes_incoming_actuator_command():
         writer.write(encode_message(command))
         await writer.drain()
         received.append(decode_message(await reader.readline()))
+        node.stop()
         writer.close()
         await writer.wait_closed()
 
@@ -221,6 +222,7 @@ async def _test_node_reports_protocol_error_and_continues_processing():
         writer.write(encode_message(command))
         await writer.drain()
         received.append(decode_message(await reader.readline()))
+        node.stop()
         writer.close()
         await writer.wait_closed()
 
@@ -271,6 +273,7 @@ async def _test_node_rejects_unknown_actuator():
         writer.write(encode_message(command))
         await writer.drain()
         received.append(decode_message(await reader.readline()))
+        node.stop()
         writer.close()
         await writer.wait_closed()
 
@@ -314,6 +317,7 @@ async def _test_node_rejects_invalid_actuator_command_without_changing_state():
         writer.write(encode_message(command))
         await writer.drain()
         received.append(decode_message(await reader.readline()))
+        node.stop()
         writer.close()
         await writer.wait_closed()
 

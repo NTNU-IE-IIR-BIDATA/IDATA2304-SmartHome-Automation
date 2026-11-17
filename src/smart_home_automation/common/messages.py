@@ -1,4 +1,16 @@
+import re
+
 from .constants import ErrorCode, MessageType
+
+SAFE_VALUE_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _validate_safe_value(field_name: str, value: object) -> None:
+    if not isinstance(value, str) or not SAFE_VALUE_PATTERN.fullmatch(value):
+        raise ProtocolError(
+            ErrorCode.INVALID_SCHEMA,
+            f"Invalid characters in field {field_name}",
+        )
 
 MESSAGE_SCHEMAS = {
     MessageType.REGISTER_NODE: {
@@ -74,6 +86,24 @@ def validate_message(message: dict):
                 f"Invalid type for field {field_name}: "
                 f"expected {expected_type}, got {type(actual_value)}",
             )
+
+    safe_fields = {
+        "node_id",
+        "target_node_id",
+        "client_id",
+        "sensor_id",
+        "actuator_id",
+        "command",
+    }
+    for field_name in safe_fields.intersection(message):
+        _validate_safe_value(field_name, message[field_name])
+
+    for manifest_name in ("sensors", "actuators"):
+        for item in message.get(manifest_name, []):
+            if isinstance(item, dict) and "id" in item:
+                _validate_safe_value(f"{manifest_name}.id", item["id"])
+                if "type" in item:
+                    _validate_safe_value(f"{manifest_name}.type", item["type"])
 
 
 def create_error_message(code: ErrorCode, message: str) -> dict:

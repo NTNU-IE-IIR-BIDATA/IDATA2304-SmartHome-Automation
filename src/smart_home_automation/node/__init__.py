@@ -78,8 +78,11 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
         action="append",
         default=[],
         metavar="TYPE:ID",
-        help="Add an actuator, for example fan:fan_1. Available types: "
-             + actuator_types + ". Repeatable.",
+        help=(
+            "Add an actuator, for example fan:fan_1. Available types: "
+            + actuator_types
+            + ". Repeatable."
+        ),
     )
     parsed = parser.parse_args(arguments)
 

@@ -13,6 +13,8 @@ def encode_message(message: dict) -> bytes:
     """
     validate_message(message)
     bytestring = (json.dumps(message) + "\n").encode("utf-8")
+    if len(bytestring) > MAX_MESSAGE_SIZE:
+        raise ProtocolError(ErrorCode.MALFORMED_JSON, "Message exceeds 64KiB limit")
     return bytestring
 
 
