@@ -1,6 +1,13 @@
 import asyncio
 
-from smart_home_automation.common.constants import ActuatorState, ErrorCode, MessageType, SensorType
+from smart_home_automation.common.constants import (
+    ActuatorState,
+    ActuatorType,
+    ErrorCode,
+    MessageType,
+    SensorType,
+    SensorUnit,
+)
 from smart_home_automation.common.framing import decode_message, encode_message
 from smart_home_automation.node import _parse_arguments, create_node
 from smart_home_automation.node.actuators import FanActuator
@@ -19,16 +26,20 @@ def test_node_builds_register_node_message():
     assert node.registration_message() == {
         "type": MessageType.REGISTER_NODE,
         "node_id": "living_room_01",
-        "sensors": [{"id": "temp_1", "type": SensorType.TEMPERATURE.value, "unit": "celsius"}],
-        "actuators": [{"id": "fan_1", "type": "fan", "state": ActuatorState.OFF.value}],
+        "sensors": [
+            {"id": "temp_1", "type": SensorType.TEMPERATURE.value, "unit": SensorUnit.CELSIUS.value}
+        ],
+        "actuators": [
+            {"id": "fan_1", "type": ActuatorType.FAN.value, "state": ActuatorState.OFF.value}
+        ],
     }
 
 
 def test_create_node_with_selected_components():
     node = create_node(
         "kitchen_01",
-        sensors=[("temperature", "kitchen_temp_1")],
-        actuators=[("fan", "kitchen_fan_1")],
+        sensors=[(SensorType.TEMPERATURE.value, "kitchen_temp_1")],
+        actuators=[(ActuatorType.FAN.value, "kitchen_fan_1")],
     )
 
     assert node.node_id == "kitchen_01"
@@ -42,20 +53,20 @@ def test_parse_custom_node_arguments():
             "--id",
             "kitchen_01",
             "--sensor",
-            "temperature:kitchen_temp_1",
+            f"{SensorType.TEMPERATURE.value}:kitchen_temp_1",
             "--sensor",
-            "smoke:kitchen_smoke_1",
+            f"{SensorType.SMOKE.value}:kitchen_smoke_1",
             "--actuator",
-            "fan:kitchen_fan_1",
+            f"{ActuatorType.FAN.value}:kitchen_fan_1",
         ]
     )
 
     assert arguments.id == "kitchen_01"
     assert arguments.sensors == [
-        ("temperature", "kitchen_temp_1"),
-        ("smoke", "kitchen_smoke_1"),
+        (SensorType.TEMPERATURE.value, "kitchen_temp_1"),
+        (SensorType.SMOKE.value, "kitchen_smoke_1"),
     ]
-    assert arguments.actuators == [("fan", "kitchen_fan_1")]
+    assert arguments.actuators == [(ActuatorType.FAN.value, "kitchen_fan_1")]
 
 
 def test_node_sends_register_node_over_tcp():
