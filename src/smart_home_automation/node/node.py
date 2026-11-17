@@ -113,6 +113,40 @@ class SensorActuatorNode:
         self.writer.write(encode_message(response))
         await self.writer.drain()
 
+    async def handle_command(self, message: dict) -> None:
+        """Execute an actuator command and send its state confirmation."""
+        actuator_id = message["actuator_id"]
+        actuator = next(
+            (candidate for candidate in self.actuators if candidate.id == actuator_id),
+            None,
+        )
+        if actuator is None:
+            if self.writer is None:
+                raise RuntimeError(f"Node '{self.node_id}' is not connected")
+
+            error = create_error_message(
+                ErrorCode.ACTUATOR_NOT_FOUND,
+                f"Actuator {actuator_id} does not exist on node {self.node_id}.",
+            )
+            self.writer.write(encode_message(error))
+            await self.writer.drain()
+            logging.warning("Actuator '%s' was not found on node '%s'", actuator_id, self.node_id)
+            return
+
+        success = actuator.execute(message["command"], message["value"])
+        if self.writer is None:
+            raise RuntimeError(f"Node '{self.node_id}' is not connected")
+
+        response = {
+            "type": MessageType.ACTUATOR_STATE,
+            "node_id": self.node_id,
+            "actuator_id": actuator.id,
+            "state": actuator.state.value,
+            "success": success,
+        }
+        self.writer.write(encode_message(response))
+        await self.writer.drain()
+
     async def connect(self) -> None:
         """Establish TCP connection to the server if not already connected."""
         if self.is_connected:

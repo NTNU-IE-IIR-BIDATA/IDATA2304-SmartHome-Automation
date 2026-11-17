@@ -106,8 +106,76 @@ class Server:
             case MessageType.SENSOR_DATA:
                 await self._handle_sensor_data(message, writer, peer)
 
+            case MessageType.ACTUATOR_CMD:
+                await self._handle_actuator_command(message, writer, peer)
+
+            case MessageType.ACTUATOR_STATE:
+                await self._handle_actuator_state(message, writer, peer)
+
             case _:
                 logging.warning(f"Unhandled message type {msg_type} from {peer}")
+
+    async def _handle_actuator_command(self, message, writer, peer):
+        if not any(
+                connection is writer
+                for connection in self.state.get_panel_connections()
+        ):
+            raise ProtocolError(
+                ErrorCode.AUTH_FAILED,
+                "Only registered control panels can send actuator commands",
+            )
+
+        node_id = message["target_node_id"]
+        actuator_id = message["actuator_id"]
+        node_writer = self.state.get_connection(node_id)
+
+        if node_writer is None:
+            raise ProtocolError(
+                ErrorCode.NODE_NOT_FOUND,
+                f"Node {node_id} is not connected",
+            )
+
+        if self.state.get_actuator(node_id, actuator_id) is None:
+            raise ProtocolError(
+                ErrorCode.ACTUATOR_NOT_FOUND,
+                f"Actuator {actuator_id} not found on node {node_id}",
+            )
+
+        try:
+            node_writer.write(encode_message(message))
+            await node_writer.drain()
+        except OSError as error:
+            self.state.disconnect(node_writer)
+            node_writer.close()
+            raise ProtocolError(
+                ErrorCode.EXECUTION_FAILED,
+                f"Could not send command to node {node_id}",
+            ) from error
+
+        logging.info(
+            "Forwarded command %s to %s.%s",
+            message["command"],
+            node_id,
+            actuator_id,
+        )
+
+    async def _handle_actuator_state(self, message, writer, peer):
+        self.state.update_actuator_state(
+            node_id=message["node_id"],
+            actuator_id=message["actuator_id"],
+            state=message["state"],
+            connection=writer,
+        )
+
+        await self._broadcast_sensor_data(message)
+
+        logging.info(
+            "Actuator state from %s.%s: %s (success=%s)",
+            message["node_id"],
+            message["actuator_id"],
+            message["state"],
+            message["success"],
+        )
 
     async def _handle_sensor_data(self, message, writer, peer):
         """
