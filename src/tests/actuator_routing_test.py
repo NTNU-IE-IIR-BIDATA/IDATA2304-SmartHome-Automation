@@ -197,7 +197,11 @@ class TestActuatorTCP(unittest.IsolatedAsyncioTestCase):
                 for requested, expected, success in [
                     ("ON", "ON", True), ("OFF", "OFF", True), ("OPEN", "OFF", False)
                 ]:
-                    await panels[0].send_actuator_command("room", "fan_1", requested)
+                    await panels[0].send_actuator_command(
+                        "room",
+                        "fan_1",
+                        requested
+                    )
                     for queue in queues:
                         self.assertEqual(
                             await queue.get(),
