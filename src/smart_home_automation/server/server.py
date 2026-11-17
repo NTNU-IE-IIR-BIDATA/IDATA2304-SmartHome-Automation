@@ -3,6 +3,7 @@ import logging
 import ssl
 
 from ..common.constants import DEFAULT_PORT, MAX_MESSAGE_SIZE, ErrorCode, MessageType, Role
+from ..common.discovery import DiscoveryServerProtocol
 from ..common.framing import decode_message, encode_message
 from ..common.messages import ProtocolError, create_error_message
 from ..common.tls import create_server_context
@@ -17,6 +18,7 @@ class Server:
         state=None,
         cert_file: str | None = None,
         key_file: str | None = None,
+        discovery_port: int | None = None,
     ):
         if (cert_file is None) != (key_file is None):
             raise ValueError("cert_file and key_file must be provided together")
@@ -26,6 +28,8 @@ class Server:
         self.cert_file = cert_file
         self.key_file = key_file
         self.server: asyncio.Server | None = None
+        self.discovery_port = discovery_port
+        self._discovery_transport: asyncio.DatagramTransport | None = None
 
     async def start(self):
         """
@@ -44,6 +48,15 @@ class Server:
             ssl=tls_context,
         )
 
+        if self.discovery_port is not None:
+            tcp_port = self.server.sockets[0].getsockname()[1]
+            loop = asyncio.get_running_loop()
+            self._discovery_transport, _ = await loop.create_datagram_endpoint(
+                lambda: DiscoveryServerProtocol(tcp_port),
+                local_addr=(self.host, self.discovery_port),
+            )
+            logging.info(f"Discoverer listening on {self.host} {self.discovery_port}")
+
         addrs = ", ".join(str(sock.getsockname()) for sock in self.server.sockets)
         logging.info(f"Server listening on {addrs}")
 
@@ -52,6 +65,10 @@ class Server:
 
     async def stop(self):
         """Stop the server gracefully"""
+
+        if self._discovery_transport is not None:
+            self._discovery_transport.close()
+            self._discovery_transport = None
 
         if self.server:
             self.server.close()

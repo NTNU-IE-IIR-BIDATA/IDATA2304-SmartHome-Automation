@@ -9,6 +9,7 @@ from smart_home_automation.common.constants import (
     ActuatorType,
     SensorType,
 )
+from smart_home_automation.common.discovery import discover_server
 
 from .actuators import create_actuator
 from .node import SensorActuatorNode, run_node
@@ -76,6 +77,12 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
     )
     parser.add_argument("--ca-file", help="CA certificate file used to verify the TLS server.")
 
+    parser.add_argument(
+        "--discover",
+        action="store_true",
+        help="Discover the server automatically instead of providing a host and port",
+    )
+
     sensor_types = ", ".join(sensor.value for sensor in SensorType)
     actuator_types = ", ".join(actuator.value for actuator in ActuatorType)
 
@@ -124,13 +131,22 @@ def main(arguments: Sequence[str] | None = None) -> None:
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
     parsed = _parse_arguments(arguments)
+    host, port = parsed.host, parsed.port
+
+    if parsed.discover:
+        try:
+            host, port = asyncio.run(discover_server())
+            logging.info(f"Discovered server at {host} {port}")
+        except TimeoutError:
+            logging.info("Discovery timed out")
+            return
     try:
         node = create_node(
             parsed.id,
             parsed.sensors,
             parsed.actuators,
-            host=parsed.host,
-            port=parsed.port,
+            host=host,
+            port=port,
             ca_file=parsed.ca_file,
         )
         asyncio.run(start_node(node))

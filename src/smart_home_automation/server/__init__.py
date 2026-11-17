@@ -3,7 +3,7 @@ import asyncio
 import logging
 from typing import Sequence
 
-from smart_home_automation.common.constants import DEFAULT_HOST, DEFAULT_PORT
+from smart_home_automation.common.constants import DEFAULT_HOST, DEFAULT_PORT, DISCOVERY_PORT
 
 from .server import Server
 
@@ -51,6 +51,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
         port=parsed.port,
         cert_file=parsed.cert_file,
         key_file=parsed.key_file,
+        discovery_port=DISCOVERY_PORT,
     )
 
     try:

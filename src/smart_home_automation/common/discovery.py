@@ -1,0 +1,65 @@
+import asyncio
+import json
+from asyncio import transports
+from typing import Any
+
+from .constants import DISCOVER_SERVER, DISCOVERY_PORT, DISCOVERY_TIMEOUT, SERVER_OFFER
+
+
+class DiscoveryServerProtocol(asyncio.DatagramProtocol):
+    def __init__(self, tcp_port: int) -> None:
+        self.tcp_port = tcp_port
+        self.transport: asyncio.DatagramTransport | None = None
+
+    def connection_made(self, transport: transports.DatagramTransport) -> None:
+        self.transport = transport
+
+    def datagram_received(self, data: bytes, addr: tuple[Any, ...]) -> None:
+        try:
+            msg = json.loads(data.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return
+
+        if isinstance(msg, dict) and msg.get("type") == DISCOVER_SERVER and self.transport:
+            reply = json.dumps({"type": SERVER_OFFER, "port": self.tcp_port}).encode("utf-8")
+            self.transport.sendto(reply, addr)
+
+
+class _DiscoveryClientProtocol(asyncio.DatagramProtocol):
+    def __init__(self, future: asyncio.Future[tuple[str, int]]) -> None:
+        self.future = future
+
+    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+        try:
+            msg = json.loads(data.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return
+
+        if isinstance(msg, dict) and msg.get("type") == SERVER_OFFER and not self.future.done():
+            port = msg.get("port")
+            if isinstance(port, int) and not isinstance(port, bool):
+                self.future.set_result((addr[0], port))
+
+
+async def discover_server(
+    discovery_port: int = DISCOVERY_PORT,
+    timeout: float = DISCOVERY_TIMEOUT,
+    broadcast_addr: str = "255.255.255.255",
+) -> tuple[str, int]:
+    loop = asyncio.get_running_loop()
+    future: asyncio.Future[tuple[str, int]] = loop.create_future()
+
+    transport, _ = await loop.create_datagram_endpoint(
+        lambda: _DiscoveryClientProtocol(future), local_addr=("0.0.0.0", 0), allow_broadcast=True
+    )
+    try:
+        probe = json.dumps({"type": DISCOVER_SERVER}).encode("utf-8")
+        for target in {broadcast_addr, "127.0.0.1"}:
+            try:
+                transport.sendto(probe, (target, discovery_port))
+            except OSError:
+                pass
+
+        return await asyncio.wait_for(future, timeout=timeout)
+    finally:
+        transport.close()
