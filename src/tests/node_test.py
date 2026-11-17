@@ -1,6 +1,8 @@
 import asyncio
 
 from smart_home_automation.common.constants import (
+    DEFAULT_HOST,
+    DEFAULT_PORT,
     ActuatorState,
     ActuatorType,
     ErrorCode,
@@ -67,6 +69,41 @@ def test_parse_custom_node_arguments():
         (SensorType.SMOKE.value, "kitchen_smoke_1"),
     ]
     assert arguments.actuators == [(ActuatorType.FAN.value, "kitchen_fan_1")]
+    assert arguments.host == DEFAULT_HOST
+    assert arguments.port == DEFAULT_PORT
+
+
+def test_parse_custom_node_host_and_port():
+    arguments = _parse_arguments(
+        [
+            "--id",
+            "kitchen_01",
+            "--host",
+            "192.168.1.25",
+            "--port",
+            "6000",
+            "--sensor",
+            f"{SensorType.TEMPERATURE.value}:kitchen_temp_1",
+        ]
+    )
+
+    assert arguments.host == "192.168.1.25"
+    assert arguments.port == 6000
+
+
+def test_parse_custom_node_ip_alias():
+    arguments = _parse_arguments(
+        [
+            "--id",
+            "kitchen_01",
+            "--ip",
+            "192.168.1.25",
+            "--sensor",
+            f"{SensorType.TEMPERATURE.value}:kitchen_temp_1",
+        ]
+    )
+
+    assert arguments.host == "192.168.1.25"
 
 
 def test_node_sends_register_node_over_tcp():

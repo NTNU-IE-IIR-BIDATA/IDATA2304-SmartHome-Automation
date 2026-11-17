@@ -61,6 +61,19 @@ def _parse_component_spec(spec: str, component: str) -> tuple[str, str]:
 def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Start a Smart Home sensor-actuator node.")
     parser.add_argument("--id", help="Unique node ID for a custom node.")
+    parser.add_argument(
+        "--host",
+        "--ip",
+        dest="host",
+        default=DEFAULT_HOST,
+        help=f"Server IP address or hostname (default: {DEFAULT_HOST}).",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=DEFAULT_PORT,
+        help=f"Server TCP port (default: {DEFAULT_PORT}).",
+    )
 
     sensor_types = ", ".join(sensor.value for sensor in SensorType)
     actuator_types = ", ".join(actuator.value for actuator in ActuatorType)
@@ -70,14 +83,22 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
         action="append",
         default=[],
         metavar="TYPE:ID",
-        help="Add a sensor, for example temperature:temp_1. Available types: " + sensor_types + ". Repeatable.",
+        help=(
+            "Add a sensor, for example temperature:temp_1. Available types: "
+            + sensor_types
+            + ". Repeatable."
+        ),
     )
     parser.add_argument(
         "--actuator",
         action="append",
         default=[],
         metavar="TYPE:ID",
-        help="Add an actuator, for example fan:fan_1. Available types: " + actuator_types + ". Repeatable.",
+        help=(
+            "Add an actuator, for example fan:fan_1. Available types: "
+            + actuator_types
+            + ". Repeatable."
+        ),
     )
     parsed = parser.parse_args(arguments)
 
@@ -107,7 +128,13 @@ def main(arguments: Sequence[str] | None = None) -> None:
     )
     parsed = _parse_arguments(arguments)
     try:
-        node = create_node(parsed.id, parsed.sensors, parsed.actuators)
+        node = create_node(
+            parsed.id,
+            parsed.sensors,
+            parsed.actuators,
+            host=parsed.host,
+            port=parsed.port,
+        )
         asyncio.run(start_node(node))
     except KeyboardInterrupt:
         logging.info("Node shutdown complete.")
