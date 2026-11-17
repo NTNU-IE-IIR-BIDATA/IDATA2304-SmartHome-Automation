@@ -25,9 +25,7 @@ def test_server_requires_certificate_and_key_together():
 
 
 def test_server_tls_arguments_are_parsed():
-    arguments = parse_server_arguments(
-        ["--cert-file", "server.crt", "--key-file", "server.key"]
-    )
+    arguments = parse_server_arguments(["--cert-file", "server.crt", "--key-file", "server.key"])
 
     assert arguments.cert_file == "server.crt"
     assert arguments.key_file == "server.key"
