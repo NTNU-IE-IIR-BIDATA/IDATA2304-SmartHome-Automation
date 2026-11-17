@@ -1,17 +1,30 @@
 import asyncio
 import logging
+import ssl
 
 from ..common.constants import DEFAULT_PORT, MAX_MESSAGE_SIZE, ErrorCode, MessageType, Role
 from ..common.framing import decode_message, encode_message
 from ..common.messages import ProtocolError, create_error_message
+from ..common.tls import create_server_context
 from .state import ServerState
 
 
 class Server:
-    def __init__(self, host: str = "127.0.0.1", port: int = DEFAULT_PORT, state=None):
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = DEFAULT_PORT,
+        state=None,
+        cert_file: str | None = None,
+        key_file: str | None = None,
+    ):
+        if (cert_file is None) != (key_file is None):
+            raise ValueError("cert_file and key_file must be provided together")
         self.host = host
         self.port = port
         self.state = state if state is not None else ServerState()
+        self.cert_file = cert_file
+        self.key_file = key_file
         self.server: asyncio.Server | None = None
 
     async def start(self):
@@ -19,11 +32,16 @@ class Server:
         Start the server
         :return:
         """
+        tls_context: ssl.SSLContext | None = None
+        if self.cert_file is not None and self.key_file is not None:
+            tls_context = create_server_context(self.cert_file, self.key_file)
+
         self.server = await asyncio.start_server(
             self.handle_client,
             self.host,
             self.port,
             limit=MAX_MESSAGE_SIZE,
+            ssl=tls_context,
         )
 
         addrs = ", ".join(str(sock.getsockname()) for sock in self.server.sockets)

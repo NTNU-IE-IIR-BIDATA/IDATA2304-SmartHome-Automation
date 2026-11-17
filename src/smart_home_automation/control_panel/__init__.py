@@ -9,7 +9,11 @@ from .ui import ControlPanelApp
 
 
 def create_control_panel(
-    panel_id: str, role: str, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT
+    panel_id: str,
+    role: str,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    ca_file: str | None = None,
 ) -> ControlPanelClient:
     """
     Create a control panel client
@@ -19,7 +23,13 @@ def create_control_panel(
     :param role: role of the panel, e.g. owner, admin, guest
     :return: a new control panel client
     """
-    return ControlPanelClient(client_id=panel_id, role=role, host=host, port=port)
+    return ControlPanelClient(
+        client_id=panel_id,
+        role=role,
+        host=host,
+        port=port,
+        ca_file=ca_file,
+    )
 
 
 def start_control_panel(control_panel: ControlPanelClient):
@@ -54,6 +64,7 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
         default=DEFAULT_PORT,
         help=f"Server port to connect to. Default: {DEFAULT_PORT}",
     )
+    parser.add_argument("--ca-file", help="CA certificate file used to verify the TLS server.")
     return parser.parse_args(arguments)
 
 
@@ -61,7 +72,11 @@ def main(arguments: Sequence[str] | None = None) -> None:
     """Entry point of 'uv run control_panel'"""
     parsed = _parse_arguments(arguments)
     control_panel = create_control_panel(
-        panel_id=parsed.id, role=parsed.role, host=parsed.host, port=parsed.port
+        panel_id=parsed.id,
+        role=parsed.role,
+        host=parsed.host,
+        port=parsed.port,
+        ca_file=parsed.ca_file,
     )
     start_control_panel(control_panel)
 

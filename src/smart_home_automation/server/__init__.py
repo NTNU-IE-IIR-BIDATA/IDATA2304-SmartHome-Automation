@@ -19,7 +19,12 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
         type=int,
         help=f"Port to use for the server. Default: {DEFAULT_PORT}",
     )
-    return parser.parse_args(arguments)
+    parser.add_argument("--cert-file", help="TLS server certificate file.")
+    parser.add_argument("--key-file", help="TLS server private key file.")
+    parsed = parser.parse_args(arguments)
+    if (parsed.cert_file is None) != (parsed.key_file is None):
+        parser.error("--cert-file and --key-file must be provided together")
+    return parsed
 
 
 async def run_server(server: Server | None = None) -> None:
@@ -41,7 +46,12 @@ def main(arguments: Sequence[str] | None = None) -> None:
     )
     parsed = _parse_arguments(arguments)
 
-    server = Server(host=parsed.host, port=parsed.port)
+    server = Server(
+        host=parsed.host,
+        port=parsed.port,
+        cert_file=parsed.cert_file,
+        key_file=parsed.key_file,
+    )
 
     try:
         asyncio.run(run_server(server))

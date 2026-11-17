@@ -82,6 +82,8 @@ def test_parse_custom_node_host_and_port():
             "192.168.1.25",
             "--port",
             "6000",
+            "--ca-file",
+            "ca.crt",
             "--sensor",
             f"{SensorType.TEMPERATURE.value}:kitchen_temp_1",
         ]
@@ -89,6 +91,7 @@ def test_parse_custom_node_host_and_port():
 
     assert arguments.host == "192.168.1.25"
     assert arguments.port == 6000
+    assert arguments.ca_file == "ca.crt"
 
 
 def test_parse_custom_node_ip_alias():

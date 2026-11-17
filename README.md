@@ -41,41 +41,46 @@ uv sync
 
 ## Quick start
 
-Open three terminals in the project directory and run each part with the default local address (`127.0.0.1:5555`):
+Open three terminals in the project directory and use TLS for every
+connection. The repository includes demo certificates so no certificate
+generation is needed for the exam setup:
 
 Terminal 1 (server):
 
 ```bash
-uv run server
+uv run server --cert-file tls/demo/server.crt --key-file tls/demo/server.key
 ```
 
 Terminal 2 (example node):
 
 ```bash
-uv run node --id living_room_01 \
-  --sensor temperature:temp_1 \
-  --sensor humidity:humidity_1 \
-  --actuator fan:fan_1
+uv run node --id living_room_01 --ca-file tls/demo/ca.crt --sensor temperature:temp_1 --sensor humidity:humidity_1 --actuator fan:fan_1
 ```
 
 Terminal 3 (control panel):
 
 ```bash
-uv run control_panel
+uv run control_panel --ca-file tls/demo/ca.crt
 ```
+
+The files in `tls/demo` are intentionally included demo keys for this exam
+project. They must be replaced with newly generated CA and server certificates
+and private keys before deploying the application anywhere.
 
 ## Running each component
 
 ### Server
 
 ```bash
-uv run server [--host HOST] [--port PORT]
+uv run server --cert-file tls/demo/server.crt --key-file tls/demo/server.key \
+  [--host HOST] [--port PORT]
 ```
 
-Defaults to `127.0.0.1` on port `5555`. To accept connections from other machines on your local network, bind to `0.0.0.0`:
+The server defaults to host `127.0.0.1` on port `5555`. But you can use others host and port to:
 
 ```bash
-uv run server --host 0.0.0.0 --port 5555
+uv run server --host 0.0.0.0 --port 5555 \
+  --cert-file tls/demo/server.crt --key-file tls/demo/server.key
 ```
 
 ### Sensor-actuator node
@@ -84,12 +89,15 @@ A node needs a unique `--id` and at least one `--sensor` or `--actuator` in `TYP
 
 ```bash
 uv run node --id NODE_ID \
+  --ca-file tls/demo/ca.crt \
   --sensor TYPE:ID \
   --actuator TYPE:ID \
   [--host HOST] [--port PORT]
 ```
 
 `--host` (or `--ip`) and `--port` default to `127.0.0.1` and `5555`.
+`--ca-file` verifies the server certificate and is required for the documented
+TLS startup.
 
 Supported sensor types: `temperature`, `humidity`, `smoke`, `air_quality`, `power`, `motion`, `leak`
 
@@ -100,10 +108,13 @@ Run `uv run node --help` to see all options.
 ### Control panel
 
 ```bash
-uv run control_panel [--id PANEL_ID] [--role ROLE] [--host HOST] [--port PORT]
+uv run control_panel [--id PANEL_ID] [--role ROLE] [--host HOST] [--port PORT] \
+  --ca-file tls/demo/ca.crt
 ```
 
 By default, it connects to `127.0.0.1:5555` as `panel_1` with role `OWNER`.
+`--ca-file` verifies the server certificate and is required for the documented
+TLS startup.
 
 Available roles:
 
