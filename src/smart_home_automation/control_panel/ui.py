@@ -103,6 +103,10 @@ class ControlPanelApp(App):
             self.client.on_update = self.handle_server_update
             self.run_worker(self._run_client(), name="panel-client")
 
+    def on_unmount(self) -> None:
+        if self.client is not None:
+            self.client.stop()
+
     async def _run_client(self) -> None:
         if self.client is None:
             return
