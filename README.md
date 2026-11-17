@@ -1,134 +1,150 @@
 # Smart Home Automation
 
-An IDATA2304 project that implements a small smart-home system. The
-application uses an asynchronous TCP server to connect sensor and actuator nodes
-to a Textual control panel.
+An IDATA2304 group project that implements a smart-home system with simulated sensor-actuator nodes, a central TCP server, and a Textual control panel.
 
-## What this project does
+## Overview
 
 The system has three parts:
 
-1. **Server** – central hub that accepts connections, stores the latest system
-   state, routes actuator commands, and broadcasts updates.
-2. **Sensor-actuator node** – client that registers sensors and actuators,
-   periodically sends sensor readings, and executes actuator commands.
-3. **Control panel** – terminal user interface that displays sensor data,
-   reports anomalies, and sends actuator commands.
+1. **Server** - accepts connections, keeps track of node and sensor state, checks panel permissions, routes actuator commands, and forwards updates.
+2. **Sensor-actuator node** - registers sensors and actuators, sends sensor readings every 5 seconds, and runs actuator commands from the server.
+3. **Control panel** - terminal UI showing connected nodes, live sensor readings, anomaly warnings, and an input bar for actuator commands.
 
-Communication uses the Smart Home Automation Protocol (SHAP): newline-delimited
-JSON messages over TCP. The default server address is `127.0.0.1:5555`.
-See [protocol.md](protocol.md) for the complete protocol specification.
+Nodes and control panels talk to the server using the Smart Home Automation Protocol (SHAP), which sends newline-delimited JSON messages over TCP. The default address is `127.0.0.1:5555`. See [protocol.md](protocol.md) for the full specification.
+
+### How messages flow
+
+1. A node connects to the server and sends its sensor/actuator manifest (`REGISTER_NODE`).
+2. The node pushes sensor readings every 5 seconds (`SENSOR_DATA`).
+3. A control panel connects (`REGISTER_PANEL`) and gets the current `SYSTEM_STATE`.
+4. New sensor readings and actuator updates are forwarded to all connected control panels.
+5. When a user enters a command, the server checks the panel's role and forwards `ACTUATOR_CMD` to the target node(s).
+6. The node runs the command and replies with `ACTUATOR_STATE`, which is broadcast back to the control panels.
+
+If a connection drops, nodes automatically retry with backoff, and the control panel tries to reconnect a few times before stopping. On the server side, malformed messages return an `ERROR` response, and repeated protocol errors close the connection.
 
 ## Requirements
 
-- Python 3.15
-- [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
-- A terminal that supports the Textual control panel
-
-The required Python version is defined in `pyproject.toml`.
+- Python 3.15 (set in `pyproject.toml`)
+- `uv` ([installation guide](https://docs.astral.sh/uv/getting-started/installation/))
+- A terminal with UTF-8 and color support for the Textual UI
 
 ## Installation
 
-Clone the repository and move into the project directory:
+Clone the repository and install dependencies:
 
-```console
+```bash
 git clone https://github.com/NTNU-IE-IIR-BIDATA/IDATA2304-SmartHome-Automation.git
 cd IDATA2304-SmartHome-Automation
-```
-
-Install Python 3.15 if needed, then create the project environment and install
-dependencies:
-
-```console
-uv python install 3.15
 uv sync
 ```
 
-## Running the application
+## Quick start
 
-Start each component in its own terminal, from the project directory.
+Open three terminals in the project directory and run each part with the default local address (`127.0.0.1:5555`):
 
-### 1. Start the server
+Terminal 1 (server):
 
-```console
+```bash
 uv run server
 ```
 
-The server listens on `127.0.0.1:5555` by default.
+Terminal 2 (example node):
 
-### 2. Start a sensor-actuator node
-
-Provide a unique node ID and at least one sensor or actuator. Components use
-the format `TYPE:ID`:
-
-```console
-uv run node --id ID 
-  --host 192.168.1.25
-  --port 6000
-  --sensor TYPE:ID
-  --actuator TYPE:ID
-```
-
-`--host` (also available as `--ip`) and `--port` select the server address.
-They default to `127.0.0.1` and `5555` when omitted.
-
-Available sensor types:
-
-`temperature`, `humidity`, `smoke`, `air_quality`, `power`, `motion`, `leak`
-
-Available actuator types:
-
-`fan`, `heater`, `lock`
-
-Both `--sensor` and `--actuator` can be repeated. 
-
-Example:
-
-```console
-uv run node --id living_room_01 
-  --sensor temperature:temp_1 
-  --sensor humidity:humidity_1 
+```bash
+uv run node --id living_room_01 \
+  --sensor temperature:temp_1 \
+  --sensor humidity:humidity_1 \
   --actuator fan:fan_1
 ```
 
-Run `uv run node --help` to see all command-line options.
+Terminal 3 (control panel):
 
-### 3. Start the control panel
-
-```console
+```bash
 uv run control_panel
 ```
 
-The control panel connects as `panel_1` with the `OWNER` role. It displays
-connected sensors and actuators and includes an anomaly feed.
+## Running each component
 
-To send an actuator command, enter the following in the command field:
+### Server
 
-```text
-<node_id> <actuator_id> <command> [value]
+```bash
+uv run server [--host HOST] [--port PORT]
 ```
 
-Example:
+Defaults to `127.0.0.1` on port `5555`. To accept connections from other machines on your local network, bind to `0.0.0.0`:
+
+```bash
+uv run server --host 0.0.0.0 --port 5555
+```
+
+### Sensor-actuator node
+
+A node needs a unique `--id` and at least one `--sensor` or `--actuator` in `TYPE:ID` format. Both flags can be passed multiple times.
+
+```bash
+uv run node --id NODE_ID \
+  --sensor TYPE:ID \
+  --actuator TYPE:ID \
+  [--host HOST] [--port PORT]
+```
+
+`--host` (or `--ip`) and `--port` default to `127.0.0.1` and `5555`.
+
+Supported sensor types: `temperature`, `humidity`, `smoke`, `air_quality`, `power`, `motion`, `leak`
+
+Supported actuator types: `fan`, `heater`, `lock`
+
+Run `uv run node --help` to see all options.
+
+### Control panel
+
+```bash
+uv run control_panel [--id PANEL_ID] [--role ROLE] [--host HOST] [--port PORT]
+```
+
+By default, it connects to `127.0.0.1:5555` as `panel_1` with role `OWNER`.
+
+Available roles:
+
+- `SHA_ADMIN` / `OWNER`: can send all actuator commands
+- `GUEST`: can only send `ON` / `OFF` to `fan` actuators
+- `TECHNICIAN`: read-only monitoring (cannot control actuators)
+
+The anomaly feed flags out-of-range readings (for example high/low temperature, humidity, power, air quality, or triggered `smoke`/`leak` sensors) as `WARNING` or `CRITICAL`.
+
+To control an actuator, type a command in the bottom input box:
+
+```text
+<node_id|ALL> <actuator_id|ALL> <command>
+```
+
+You can also prefix commands with `set` or `cmd`, and use `ALL` to target every connected node or every actuator on a node:
 
 ```text
 living_room_01 fan_1 ON
+living_room_01 ALL OFF
+ALL fan_1 ON
 ```
 
-Supported commands include `ON`, `OFF`, `OPEN`, and `CLOSED`, depending on the
-actuator. Press `q` to quit the control panel and `c` to clear the anomaly
-feed.
+Valid commands by actuator type:
 
-## Testing and code quality
+- `fan`, `heater`: `ON`, `OFF`
+- `lock`: `OPEN`, `CLOSED`
 
-Run the tests:
+Shortcuts: `q` quits the panel, `c` clears the anomaly feed.
 
-```console
+## Testing and linting
+
+Run tests:
+
+```bash
 uv run pytest
 ```
 
 Run the linter:
 
-```console
+```bash
 uv run ruff check
 ```
 
@@ -137,26 +153,11 @@ uv run ruff check
 ```text
 src/
 ├── smart_home_automation/
-│   ├── common/                 Shared constants, framing, and messages
+│   ├── common/                 Shared constants, framing, and message validation
 │   ├── server/                 TCP server and system state
-│   ├── node/                   Sensors, actuators, and node client
-│   └── control_panel/          Control-panel client and Textual UI
+│   ├── node/                   Simulated sensors, actuators, and node client
+│   └── control_panel/          Control-panel client, anomaly detector, and Textual UI
 └── tests/                      Unit and integration tests
-protocol.md                    SHAP protocol specification
-pyproject.toml                 Project metadata and dependencies
+protocol.md                     SHAP protocol specification
+pyproject.toml                  Project metadata, scripts, and dependencies
 ```
-
-## How messages flow
-
-1. A node connects to the server and sends its sensor/actuator manifest.
-2. The node sends sensor readings approximately every five seconds.
-3. The control panel connects and receives the current system state.
-4. Sensor and actuator updates are forwarded to connected control panels.
-5. A control-panel command is validated by the server and forwarded to the
-   target node.
-6. The node executes the command and sends an actuator-state confirmation.
-
-All messages are UTF-8 encoded JSON objects terminated by a newline. The
-server rejects malformed messages and closes a connection after repeated
-protocol errors.
-
