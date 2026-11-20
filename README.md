@@ -12,6 +12,8 @@ The system has three parts:
 
 Nodes and control panels talk to the server using the Smart Home Automation Protocol (SHAP), which sends newline-delimited JSON messages over TCP. The default address is `127.0.0.1:5555`, and the server also listens on UDP port `5556` for automatic discovery. See [protocol.md](protocol.md) for the full specification.
 
+Sprint reports can be found in [sprint_reports.md](sprint_reports.md).
+
 ### How messages flow
 
 1. A node connects to the server and sends its sensor/actuator manifest (`REGISTER_NODE`).
